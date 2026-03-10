@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getContactCount } from "@/services/contact.service";
-import { getRecentCommunicationsCount } from "@/services/communication.service";
+import { getRecentCommunicationsCounts } from "@/services/communication.service";
 
 export const metadata = { title: "Dashboard" };
 
@@ -20,10 +20,9 @@ export default async function DashboardPage() {
   const session = await getServerSession(authOptions);
   if (!session) redirect("/login");
 
-  const [contactCount, todayCount, weekCount] = await Promise.all([
+  const [contactCount, { todayCount, weekCount }] = await Promise.all([
     getContactCount(session.user.id),
-    getRecentCommunicationsCount(session.user.id, 1),
-    getRecentCommunicationsCount(session.user.id, 7),
+    getRecentCommunicationsCounts(session.user.id),
   ]);
 
   const stats = [

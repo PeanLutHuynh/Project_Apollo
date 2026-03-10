@@ -7,7 +7,6 @@ import { Mail, Loader2, CheckCircle, XCircle, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Form,
   FormControl,
@@ -28,6 +27,7 @@ interface Contact {
 
 export default function BulkEmailForm() {
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [result, setResult] = useState<{
     success: boolean;
     message: string;
@@ -44,31 +44,20 @@ export default function BulkEmailForm() {
     defaultValues: { contactIds: [], subject: "", message: "" },
   });
 
-  const selectedIds = form.watch("contactIds");
+  const selectedCount = selectedIds.length;
 
   function toggleAll() {
-    if (selectedIds.length === contacts.length) {
-      form.setValue("contactIds", [], { shouldValidate: true });
-    } else {
-      form.setValue(
-        "contactIds",
-        contacts.map((c) => c.id),
-        { shouldValidate: true }
-      );
-    }
+    const newVal = selectedIds.length === contacts.length ? [] : contacts.map((c) => c.id);
+    setSelectedIds(newVal);
+    form.setValue("contactIds", newVal, { shouldValidate: true });
   }
 
   function toggleContact(id: string) {
-    const current = form.getValues("contactIds");
-    if (current.includes(id)) {
-      form.setValue(
-        "contactIds",
-        current.filter((x) => x !== id),
-        { shouldValidate: true }
-      );
-    } else {
-      form.setValue("contactIds", [...current, id], { shouldValidate: true });
-    }
+    const newVal = selectedIds.includes(id)
+      ? selectedIds.filter((x) => x !== id)
+      : [...selectedIds, id];
+    setSelectedIds(newVal);
+    form.setValue("contactIds", newVal, { shouldValidate: true });
   }
 
   async function onSubmit(values: BulkEmailFormValues) {
@@ -86,6 +75,7 @@ export default function BulkEmailForm() {
         success: true,
         message: `Sent to ${sent} contact${sent !== 1 ? "s" : ""}${failed > 0 ? `. ${failed} failed.` : "."}`,
       });
+      setSelectedIds([]);
       form.reset();
     } else {
       setResult({
@@ -108,10 +98,10 @@ export default function BulkEmailForm() {
               <div className="flex items-center justify-between mb-2">
                 <FormLabel>Recipients</FormLabel>
                 <div className="flex items-center gap-2">
-                  {selectedIds.length > 0 && (
+                  {selectedCount > 0 && (
                     <Badge variant="secondary">
                       <Users className="mr-1 h-3 w-3" />
-                      {selectedIds.length} selected
+                      {selectedCount} selected
                     </Badge>
                   )}
                   <Button
@@ -138,10 +128,12 @@ export default function BulkEmailForm() {
                         className="flex items-center gap-2 rounded-sm px-2 py-1.5 hover:bg-accent cursor-pointer"
                         onClick={() => toggleContact(contact.id)}
                       >
-                        <Checkbox
+                        <input
+                          type="checkbox"
                           checked={selectedIds.includes(contact.id)}
-                          onCheckedChange={() => toggleContact(contact.id)}
+                          onChange={() => toggleContact(contact.id)}
                           onClick={(e) => e.stopPropagation()}
+                          className="h-4 w-4 rounded border border-input accent-primary cursor-pointer"
                         />
                         <span className="text-sm font-medium flex-1">
                           {contact.fullName}
@@ -204,7 +196,7 @@ export default function BulkEmailForm() {
 
         <Button
           type="submit"
-          disabled={form.formState.isSubmitting || selectedIds.length === 0}
+          disabled={form.formState.isSubmitting || selectedCount === 0}
           className="w-full sm:w-auto"
         >
           {form.formState.isSubmitting ? (
@@ -215,7 +207,7 @@ export default function BulkEmailForm() {
           ) : (
             <>
               <Mail className="mr-2 h-4 w-4" />
-              Send to {selectedIds.length > 0 ? `${selectedIds.length} Contact${selectedIds.length !== 1 ? "s" : ""}` : "Contacts"}
+              Send to {selectedCount > 0 ? `${selectedCount} Contact${selectedCount !== 1 ? "s" : ""}` : "Contacts"}
             </>
           )}
         </Button>
