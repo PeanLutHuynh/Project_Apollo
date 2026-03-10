@@ -1,0 +1,81 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum CommunicationType {
+  sms
+  email
+}
+
+enum CommunicationStatus {
+  pending
+  sent
+  failed
+  delivered
+}
+
+enum UserRole {
+  user
+  admin
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+model User {
+  id        String    @id @default(uuid())
+  email     String    @unique
+  password  String
+  name      String?
+  role      UserRole  @default(user)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  contacts       Contact[]
+  communications Communication[]
+}
+
+model Contact {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fullName    String
+  address     String?
+  phoneNumber String
+  email       String
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  communications Communication[]
+
+  @@index([userId])
+  @@index([phoneNumber])
+  @@index([email])
+}
+
+model Communication {
+  id        String              @id @default(uuid())
+  userId    String
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contactId String
+  contact   Contact             @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  type      CommunicationType
+  recipient String
+  subject   String?
+  message   String
+  status    CommunicationStatus @default(pending)
+  errorMsg  String?
+  createdAt DateTime            @default(now())
+
+  @@index([userId])
+  @@index([contactId])
+  @@index([type])
+  @@index([status])
+}
