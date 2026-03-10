@@ -39,9 +39,9 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
   );
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
+    <div className="flex flex-col h-full -m-6">
+      {/* Pinned header bar — sits flush below the app Header, never scrolls */}
+      <div className="shrink-0 bg-background border-b border-border px-6 py-4 flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground">
             Communication History
@@ -83,6 +83,8 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
         </div>
       </div>
 
+      {/* Scrollable list area */}
+      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
       {/* History list */}
       {items.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground">
@@ -201,6 +203,7 @@ export default async function HistoryPage({ searchParams }: HistoryPageProps) {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

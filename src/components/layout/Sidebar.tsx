@@ -50,7 +50,7 @@ export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="w-64 shrink-0 border-r border-border bg-card hidden md:flex flex-col">
+    <aside className="w-64 shrink-0 border-r border-border bg-card hidden md:flex flex-col h-screen sticky top-0 overflow-y-auto">
       {/* Logo */}
       <div className="h-16 flex items-center gap-2 px-6 border-b border-border">
         <Phone className="h-6 w-6 text-primary" />
