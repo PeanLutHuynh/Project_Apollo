@@ -30,7 +30,6 @@ const ContactForm = dynamic(
         ))}
       </div>
     ),
-    ssr: false,
   }
 );
 

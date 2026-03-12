@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { createContactSchema } from "@/schemas/contact.schema";
 import { getContacts, createContact } from "@/services/contact.service";
-import { revalidateTag } from "next/cache";
+import { revalidatePath } from "next/cache";
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -41,6 +41,6 @@ export async function POST(req: NextRequest) {
     address: address ?? null,
     notes: notes ?? null,
   });
-  revalidateTag("contacts");
+  revalidatePath("/contacts");
   return NextResponse.json({ success: true, data: contact }, { status: 201 });
 }

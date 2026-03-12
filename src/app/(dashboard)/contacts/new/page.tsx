@@ -24,7 +24,6 @@ const ContactForm = dynamic(
         <Skeleton className="h-10 w-32" />
       </div>
     ),
-    ssr: false,
   }
 );
 

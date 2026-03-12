@@ -34,15 +34,11 @@ function FormSkeleton() {
 
 const SMSForm = dynamic(() => import("@/components/communication/SMSForm"), {
   loading: () => <FormSkeleton />,
-  ssr: false,
 });
 
 const BulkSMSForm = dynamic(
   () => import("@/components/communication/BulkSMSForm"),
-  {
-    loading: () => <FormSkeleton />,
-    ssr: false,
-  }
+  { loading: () => <FormSkeleton /> }
 );
 
 export default function SMSPage() {

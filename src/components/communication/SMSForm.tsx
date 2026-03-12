@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { MessageSquare, Loader2, CheckCircle, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -47,7 +47,7 @@ export default function SMSForm() {
     defaultValues: { contactId: "", message: "" },
   });
 
-  const message = form.watch("message");
+  const message = useWatch({ control: form.control, name: "message" });
 
   async function onSubmit(values: SendSMSFormValues) {
     setResult(null);

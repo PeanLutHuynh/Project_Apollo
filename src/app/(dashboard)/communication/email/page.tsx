@@ -32,18 +32,12 @@ function FormSkeleton() {
 
 const EmailForm = dynamic(
   () => import("@/components/communication/EmailForm"),
-  {
-    loading: () => <FormSkeleton />,
-    ssr: false,
-  }
+  { loading: () => <FormSkeleton /> }
 );
 
 const BulkEmailForm = dynamic(
   () => import("@/components/communication/BulkEmailForm"),
-  {
-    loading: () => <FormSkeleton />,
-    ssr: false,
-  }
+  { loading: () => <FormSkeleton /> }
 );
 
 export default function EmailPage() {

@@ -7,7 +7,7 @@ import {
   updateContact,
   deleteContact,
 } from "@/services/contact.service";
-import { revalidateTag } from "next/cache";
+import { revalidatePath } from "next/cache";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -42,7 +42,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
   }
 
   const contact = await updateContact(id, session.user.id, parsed.data);
-  revalidateTag("contacts");
+  revalidatePath("/contacts");
   return NextResponse.json({ success: true, data: contact });
 }
 
@@ -54,6 +54,6 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
 
   const { id } = await params;
   await deleteContact(id, session.user.id);
-  revalidateTag("contacts");
+  revalidatePath("/contacts");
   return NextResponse.json({ success: true, message: "Contact deleted" });
 }
