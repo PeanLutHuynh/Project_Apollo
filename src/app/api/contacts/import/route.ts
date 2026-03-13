@@ -21,11 +21,34 @@ function getField(row: RawRow, keys: string[]): string {
 
   for (const [key, value] of entries) {
     if (keys.includes(normalizeHeader(key))) {
-      return String(value ?? "").trim();
+      return normalizeImportedText(String(value ?? ""));
     }
   }
 
   return "";
+}
+
+function tryRepairVietnameseMojibake(value: string): string {
+  // Detect common mojibake patterns like "Huá»³nh", "TrÆ°á»ng".
+  if (!/(Ã|Â|Æ|Ä|á»|�)/.test(value)) {
+    return value;
+  }
+
+  try {
+    const repaired = Buffer.from(value, "latin1").toString("utf8");
+    return repaired.includes("�") ? value : repaired;
+  } catch {
+    return value;
+  }
+}
+
+function normalizeImportedText(value: string): string {
+  const trimmed = value.replace(/^\uFEFF/, "").trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  return tryRepairVietnameseMojibake(trimmed);
 }
 
 function normalizePhoneNumber(phone: string): string {

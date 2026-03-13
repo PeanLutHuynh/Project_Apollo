@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Plus, Search } from "lucide-react";
+import { Download, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -45,12 +45,20 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
             {total} contact{total !== 1 ? "s" : ""} total
           </p>
         </div>
-        <Button asChild>
-          <Link href="/contacts/new">
-            <Plus className="mr-2 h-4 w-4" />
-            Add Contact
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" asChild>
+            <a href="/api/contacts/export">
+              <Download className="mr-2 h-4 w-4" />
+              Export File
+            </a>
+          </Button>
+          <Button asChild>
+            <Link href="/contacts/new">
+              <Plus className="mr-2 h-4 w-4" />
+              Add Contact
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {/* Search */}

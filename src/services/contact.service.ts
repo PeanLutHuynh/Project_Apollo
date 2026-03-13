@@ -59,6 +59,24 @@ export async function getAllContactsForUser(
   });
 }
 
+export async function getContactsForExport(
+  userId: string
+): Promise<
+  Pick<ContactDTO, "fullName" | "phoneNumber" | "email" | "address" | "notes">[]
+> {
+  return db.contact.findMany({
+    where: { userId },
+    select: {
+      fullName: true,
+      phoneNumber: true,
+      email: true,
+      address: true,
+      notes: true,
+    },
+    orderBy: { fullName: "asc" },
+  });
+}
+
 export async function createContact(
   userId: string,
   data: CreateContactInput
