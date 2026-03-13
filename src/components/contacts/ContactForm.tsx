@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import ImportContactsButton from "@/components/contacts/ImportContactsButton";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -152,7 +153,7 @@ export default function ContactForm({ defaultValues, contactId }: ContactFormPro
           </p>
         )}
 
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
           <Button
             type="submit"
             disabled={form.formState.isSubmitting}
@@ -166,6 +167,7 @@ export default function ContactForm({ defaultValues, contactId }: ContactFormPro
               isEdit ? "Save Changes" : "Create Contact"
             )}
           </Button>
+          {!isEdit && <ImportContactsButton />}
           <Button
             type="button"
             variant="outline"
