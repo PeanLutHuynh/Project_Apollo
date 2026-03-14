@@ -278,6 +278,12 @@ export default function ContactsTable({ contacts }: ContactsTableProps) {
         return;
       }
 
+      const target = event.target as HTMLElement | null;
+      const isWheelOnHeader = Boolean(target?.closest("thead"));
+      if (!isWheelOnHeader) {
+        return;
+      }
+
       const scrollContainer = root.querySelector("div.overflow-auto") as HTMLElement | null;
       if (!scrollContainer) {
         return;
@@ -290,10 +296,8 @@ export default function ContactsTable({ contacts }: ContactsTableProps) {
       }
 
       event.preventDefault();
-
-      // Mouse wheel: scroll up -> move table to the right content area, and vice versa.
       const delta = Math.abs(event.deltaY) >= Math.abs(event.deltaX)
-        ? -event.deltaY
+        ? event.deltaY
         : event.deltaX;
       scrollContainer.scrollLeft += delta;
     };
@@ -524,8 +528,8 @@ export default function ContactsTable({ contacts }: ContactsTableProps) {
                 data-state={selectedIds.includes(contact.id) ? "selected" : ""}
                 className={
                   index % 2 === 0
-                    ? "cursor-pointer bg-background hover:!bg-slate-100 dark:hover:!bg-slate-800/60"
-                    : "cursor-pointer bg-slate-50 hover:!bg-slate-100 dark:bg-muted/20 dark:hover:!bg-slate-800/60"
+                    ? "group cursor-pointer bg-background hover:!bg-slate-100 dark:bg-slate-950 dark:hover:!bg-slate-800"
+                    : "group cursor-pointer bg-slate-50 hover:!bg-slate-100 dark:bg-slate-900 dark:hover:!bg-slate-800"
                 }
                 onClick={() => router.push(`/contacts/${contact.id}`)}
                 style={
@@ -534,8 +538,13 @@ export default function ContactsTable({ contacts }: ContactsTableProps) {
                     : undefined
                 }
               >
+                {/* Sticky columns use opaque backgrounds to prevent text bleed-through in dark mode. */}
                 <TableCell
-                  className={`${isCompact ? "py-2" : "py-4"} sticky left-0 z-20 bg-inherit`}
+                  className={`${isCompact ? "py-2" : "py-4"} sticky left-0 z-20 ${
+                    index % 2 === 0
+                      ? "bg-background dark:bg-slate-950 group-hover:bg-slate-100 dark:group-hover:bg-slate-800"
+                      : "bg-slate-50 dark:bg-slate-900 group-hover:bg-slate-100 dark:group-hover:bg-slate-800"
+                  }`}
                   onClick={(event) => event.stopPropagation()}
                 >
                   <Checkbox
@@ -545,7 +554,11 @@ export default function ContactsTable({ contacts }: ContactsTableProps) {
                   />
                 </TableCell>
                 <TableCell
-                  className={`${isCompact ? "py-2" : "py-4"} sticky left-12 z-20 bg-inherit shadow-[8px_0_12px_-8px_rgba(0,0,0,0.28)]`}
+                  className={`${isCompact ? "py-2" : "py-4"} sticky left-12 z-20 shadow-[8px_0_12px_-8px_rgba(0,0,0,0.28)] ${
+                    index % 2 === 0
+                      ? "bg-background dark:bg-slate-950 group-hover:bg-slate-100 dark:group-hover:bg-slate-800"
+                      : "bg-slate-50 dark:bg-slate-900 group-hover:bg-slate-100 dark:group-hover:bg-slate-800"
+                  }`}
                   style={{ width: columnWidths.name, minWidth: columnWidths.name }}
                 >
                   <div className="flex items-center gap-2">
@@ -566,7 +579,10 @@ export default function ContactsTable({ contacts }: ContactsTableProps) {
                   className={isCompact ? "py-2" : "py-4"}
                   style={{ width: columnWidths.customerType, minWidth: columnWidths.customerType }}
                 >
-                  <Badge variant="outline" className={customerTypeBadgeClass(contact.customerType)}>
+                  <Badge
+                    variant="outline"
+                    className={`max-w-full overflow-hidden text-ellipsis whitespace-nowrap ${customerTypeBadgeClass(contact.customerType)}`}
+                  >
                     {customerTypeLabel(contact.customerType)}
                   </Badge>
                 </TableCell>
@@ -574,7 +590,9 @@ export default function ContactsTable({ contacts }: ContactsTableProps) {
                   className={isCompact ? "py-2" : "py-4"}
                   style={{ width: columnWidths.source, minWidth: columnWidths.source }}
                 >
-                  <Badge variant="outline">{sourceLabel(contact.contactSource)}</Badge>
+                  <Badge variant="outline" className="max-w-full overflow-hidden text-ellipsis whitespace-nowrap">
+                    {sourceLabel(contact.contactSource)}
+                  </Badge>
                 </TableCell>
                 <TableCell
                   className={`${isCompact ? "py-2" : "py-4"} text-muted-foreground`}
@@ -633,7 +651,11 @@ export default function ContactsTable({ contacts }: ContactsTableProps) {
                   )}
                 </TableCell>
                 <TableCell
-                  className={`${isCompact ? "py-2" : "py-4"} sticky right-0 z-10 bg-background text-right shadow-[-8px_0_12px_-8px_rgba(0,0,0,0.35)]`}
+                  className={`${isCompact ? "py-2" : "py-4"} sticky right-0 z-10 text-right shadow-[-8px_0_12px_-8px_rgba(0,0,0,0.35)] ${
+                    index % 2 === 0
+                      ? "bg-background dark:bg-slate-950 group-hover:bg-slate-100 dark:group-hover:bg-slate-800"
+                      : "bg-slate-50 dark:bg-slate-900 group-hover:bg-slate-100 dark:group-hover:bg-slate-800"
+                  }`}
                   onClick={(event) => event.stopPropagation()}
                 >
                   <div className="flex items-center justify-end gap-2">
