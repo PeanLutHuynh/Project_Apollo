@@ -10,6 +10,7 @@ export type RecipientOption = {
 };
 
 const recipientCache = new Map<string, RecipientOption[]>();
+const inflightRecipientRequests = new Map<string, Promise<RecipientOption[]>>();
 const REQUEST_TIMEOUT_MS = 8000;
 const SAFETY_LOADING_TIMEOUT_MS = 9000;
 const RECIPIENT_SEARCH_DEBUG = process.env.NODE_ENV !== "production";
@@ -20,6 +21,54 @@ function logRecipientSearch(event: string, detail: Record<string, unknown>) {
   }
 
   console.debug("[recipient-search]", event, detail);
+}
+
+function fetchRecipientsWithDedupe(
+  cacheKey: string,
+  query: string,
+  limit: number
+): Promise<RecipientOption[]> {
+  const inflight = inflightRecipientRequests.get(cacheKey);
+  if (inflight) {
+    return inflight;
+  }
+
+  const request = (async () => {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => {
+      controller.abort();
+    }, REQUEST_TIMEOUT_MS);
+
+    try {
+      const params = new URLSearchParams({
+        search: query,
+        limit: String(limit),
+      });
+
+      const res = await fetch(`/api/contacts/recipients?${params.toString()}`, {
+        signal: controller.signal,
+      });
+
+      const payload = await res.json();
+      if (!res.ok || !payload.success) {
+        return [] as RecipientOption[];
+      }
+
+      return (payload.data ?? []) as RecipientOption[];
+    } catch (error) {
+      if ((error as Error).name === "AbortError") {
+        return [] as RecipientOption[];
+      }
+
+      throw error;
+    } finally {
+      window.clearTimeout(timeoutId);
+      inflightRecipientRequests.delete(cacheKey);
+    }
+  })();
+
+  inflightRecipientRequests.set(cacheKey, request);
+  return request;
 }
 
 export function useRecipientSearch(limit = 50, enabled = true) {
@@ -65,7 +114,6 @@ export function useRecipientSearch(limit = 50, enabled = true) {
     }
 
     let cancelled = false;
-    const controller = new AbortController();
     const timer = window.setTimeout(async () => {
       logRecipientSearch("fetch-start", {
         requestSeq,
@@ -73,37 +121,24 @@ export function useRecipientSearch(limit = 50, enabled = true) {
         limit,
       });
       setIsLoading(true);
-      let timeoutId: number | null = null;
       let safetyStopId: number | null = null;
       try {
-        const params = new URLSearchParams({
-          search: effectiveQuery,
-          limit: String(limit),
-        });
-
-        timeoutId = window.setTimeout(() => {
-          controller.abort();
-        }, REQUEST_TIMEOUT_MS);
-
         // Safety valve: if fetch hangs unexpectedly, never keep spinner forever.
         safetyStopId = window.setTimeout(() => {
-          if (!cancelled && mountedRef.current) {
+          if (!cancelled && mountedRef.current && requestSeqRef.current === requestSeq) {
             setIsLoading(false);
           }
-          controller.abort();
         }, SAFETY_LOADING_TIMEOUT_MS);
 
-        const res = await fetch(`/api/contacts/recipients?${params.toString()}`, {
-          signal: controller.signal,
-        });
+        if (inflightRecipientRequests.has(cacheKey)) {
+          logRecipientSearch("inflight-hit", {
+            requestSeq,
+            query: effectiveQuery,
+            limit,
+          });
+        }
 
-        window.clearTimeout(timeoutId);
-        timeoutId = null;
-
-        const payload = await res.json();
-        const nextResults = !res.ok || !payload.success
-          ? []
-          : ((payload.data ?? []) as RecipientOption[]);
+        const nextResults = await fetchRecipientsWithDedupe(cacheKey, effectiveQuery, limit);
 
         if (!cancelled && mountedRef.current && requestSeqRef.current === requestSeq) {
           recipientCache.set(cacheKey, nextResults);
@@ -112,7 +147,7 @@ export function useRecipientSearch(limit = 50, enabled = true) {
             requestSeq,
             query: effectiveQuery,
             size: nextResults.length,
-            status: res.status,
+            deduped: true,
           });
         }
       } catch (error) {
@@ -127,9 +162,6 @@ export function useRecipientSearch(limit = 50, enabled = true) {
           message: (error as Error).message,
         });
       } finally {
-        if (timeoutId !== null) {
-          window.clearTimeout(timeoutId);
-        }
         if (safetyStopId !== null) {
           window.clearTimeout(safetyStopId);
         }
@@ -150,7 +182,6 @@ export function useRecipientSearch(limit = 50, enabled = true) {
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
-      controller.abort();
 
       if (mountedRef.current && requestSeqRef.current === requestSeq) {
         setIsLoading(false);

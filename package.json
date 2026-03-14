@@ -9,7 +9,8 @@
     "lint": "eslint src",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "db:optimize": "prisma db execute --file prisma/manual-optimizations.sql --schema prisma/schema.prisma"
   },
   "dependencies": {
     "@aws-sdk/client-ses": "^3.741.0",

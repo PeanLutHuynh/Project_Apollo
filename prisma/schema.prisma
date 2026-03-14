@@ -73,6 +73,10 @@ model Contact {
   @@index([userId])
   @@index([phoneNumber])
   @@index([email])
+  @@index([userId, createdAt])
+  @@index([userId, fullName])
+  @@index([userId, email])
+  @@index([userId, phoneNumber])
 }
 
 model Communication {
