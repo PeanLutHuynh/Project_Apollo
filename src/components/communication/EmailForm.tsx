@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Mail, Loader2, CheckCircle, XCircle } from "lucide-react";
@@ -15,30 +15,30 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { sendEmailSchema, type SendEmailFormValues } from "@/schemas/communication.schema";
-
-interface Contact {
-  id: string;
-  fullName: string;
-  email: string;
-}
+import { useRecipientSearch, type RecipientOption } from "@/hooks/use-recipient-search";
 
 export default function EmailForm() {
-  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [isSuggestionsOpen, setIsSuggestionsOpen] = useState(false);
+  const { query, setQuery, results, isLoading } = useRecipientSearch(50, isSuggestionsOpen);
+  const [selectedRecipient, setSelectedRecipient] = useState<RecipientOption | null>(null);
   const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
+  const recipientBoxRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    fetch("/api/contacts?pageSize=100")
-      .then((r) => r.json())
-      .then((data) => setContacts(data.data?.items ?? []));
+    const onPointerDown = (event: MouseEvent) => {
+      if (!recipientBoxRef.current) {
+        return;
+      }
+
+      if (!recipientBoxRef.current.contains(event.target as Node)) {
+        setIsSuggestionsOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
   }, []);
 
   const form = useForm<SendEmailFormValues>({
@@ -58,6 +58,9 @@ export default function EmailForm() {
     if (res.ok && data.success) {
       setResult({ success: true, message: "Email sent successfully!" });
       form.reset();
+      setSelectedRecipient(null);
+      setQuery("");
+      setIsSuggestionsOpen(false);
     } else {
       setResult({
         success: false,
@@ -75,23 +78,50 @@ export default function EmailForm() {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Recipient</FormLabel>
-              <Select onValueChange={field.onChange} value={field.value}>
+              <div ref={recipientBoxRef} className="space-y-2">
                 <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a contact..." />
-                  </SelectTrigger>
+                  <Input
+                    placeholder="Search recipient by name, email, or phone..."
+                    value={query}
+                    onFocus={() => setIsSuggestionsOpen(true)}
+                    onChange={(event) => {
+                      setQuery(event.target.value);
+                      setIsSuggestionsOpen(true);
+                    }}
+                  />
                 </FormControl>
-                <SelectContent>
-                  {contacts.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      <span className="font-medium">{c.fullName}</span>
-                      <span className="text-muted-foreground ml-2 text-xs">
-                        {c.email}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                {isSuggestionsOpen && (
+                  <div className="max-h-44 overflow-y-auto rounded-md border">
+                    {isLoading ? (
+                      <p className="px-3 py-2 text-sm text-muted-foreground">Searching...</p>
+                    ) : results.length === 0 ? (
+                      <p className="px-3 py-2 text-sm text-muted-foreground">No matching recipients</p>
+                    ) : (
+                      results.map((recipient) => (
+                        <button
+                          key={recipient.id}
+                          type="button"
+                          className="flex w-full items-center justify-between px-3 py-2 text-left hover:bg-accent"
+                          onClick={() => {
+                            field.onChange(recipient.id);
+                            setSelectedRecipient(recipient);
+                            setQuery(recipient.fullName);
+                            setIsSuggestionsOpen(false);
+                          }}
+                        >
+                          <span className="font-medium">{recipient.fullName}</span>
+                          <span className="text-xs text-muted-foreground">{recipient.email}</span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+              {selectedRecipient && (
+                <p className="text-xs text-muted-foreground">
+                  Selected: {selectedRecipient.fullName} ({selectedRecipient.email})
+                </p>
+              )}
               <FormMessage />
             </FormItem>
           )}

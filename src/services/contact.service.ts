@@ -59,6 +59,36 @@ export async function getAllContactsForUser(
   });
 }
 
+export async function searchContactRecipients(
+  userId: string,
+  search = "",
+  limit = 30
+): Promise<Pick<ContactDTO, "id" | "fullName" | "phoneNumber" | "email">[]> {
+  const safeLimit = Math.min(Math.max(limit, 5), 50);
+  const trimmedSearch = search.trim();
+
+  return db.contact.findMany({
+    where: {
+      userId,
+      ...(trimmedSearch && {
+        OR: [
+          { fullName: { contains: trimmedSearch, mode: "insensitive" as const } },
+          { email: { contains: trimmedSearch, mode: "insensitive" as const } },
+          { phoneNumber: { contains: trimmedSearch } },
+        ],
+      }),
+    },
+    select: {
+      id: true,
+      fullName: true,
+      phoneNumber: true,
+      email: true,
+    },
+    orderBy: { fullName: "asc" },
+    take: safeLimit,
+  });
+}
+
 export async function getContactsForExport(
   userId: string
 ): Promise<

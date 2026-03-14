@@ -2,11 +2,11 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Download, Plus, RefreshCcw, Search } from "lucide-react";
+import { Download, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { getContacts } from "@/services/contact.service";
 import ContactsTable from "@/components/contacts/ContactsTable";
+import ContactsSearchBar from "@/components/contacts/ContactsSearchBar";
 
 export const metadata = { title: "Contacts" };
 
@@ -51,25 +51,7 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
       </div>
 
       {/* Search */}
-      <form method="GET">
-        <div className="flex items-center gap-2">
-          <div className="relative w-full max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              name="search"
-              placeholder="Search by name, email, or phone..."
-              defaultValue={search ?? ""}
-              className="pl-9"
-            />
-          </div>
-          <Button variant="outline" type="button" asChild>
-            <Link href="/contacts">
-              <RefreshCcw className="mr-2 h-4 w-4" />
-              Refresh
-            </Link>
-          </Button>
-        </div>
-      </form>
+      <ContactsSearchBar initialSearch={search ?? ""} />
 
       {/* Table */}
       {contacts.length === 0 ? (

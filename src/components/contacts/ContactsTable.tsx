@@ -40,7 +40,7 @@ type ResizableColumn =
   | "address"
   | "notes";
 
-type SortKey = "name" | "phone" | "createdAt";
+type SortKey = "name" | "email" | "address";
 
 type SortState = {
   key: SortKey;
@@ -102,7 +102,7 @@ export default function ContactsTable({ contacts }: ContactsTableProps) {
   const [isDeletingBulk, setIsDeletingBulk] = useState(false);
   const [isCompact, setIsCompact] = useState(false);
   const [isHeaderHovered, setIsHeaderHovered] = useState(false);
-  const [sort, setSort] = useState<SortState>({ key: "createdAt", direction: "desc" });
+  const [sort, setSort] = useState<SortState>({ key: "name", direction: "asc" });
   const [customerTypeFilter, setCustomerTypeFilter] = useState<ContactDTO["customerType"] | "all">("all");
   const [sourceFilter, setSourceFilter] = useState<ContactDTO["contactSource"] | "all">("all");
   const [columnWidths, setColumnWidths] = useState<Record<ResizableColumn, number>>({
@@ -138,10 +138,10 @@ export default function ContactsTable({ contacts }: ContactsTableProps) {
 
       if (sort.key === "name") {
         result = compareText(a.fullName, b.fullName);
-      } else if (sort.key === "phone") {
-        result = compareText(a.phoneNumber, b.phoneNumber);
+      } else if (sort.key === "email") {
+        result = compareText(a.email, b.email);
       } else {
-        result = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        result = compareText(a.address ?? "", b.address ?? "");
       }
 
       return sort.direction === "asc" ? result : -result;
@@ -503,19 +503,17 @@ export default function ContactsTable({ contacts }: ContactsTableProps) {
               />
               <ResizableHead label="Customer Type" column="customerType" />
               <ResizableHead label="Source" column="source" />
-              <ResizableHead label="Phone" column="phone" sortableKey="phone" />
-              <ResizableHead label="Email" column="email" />
-              <ResizableHead label="Address" column="address" className="hidden xl:table-cell" />
+              <ResizableHead label="Phone" column="phone" />
+              <ResizableHead label="Email" column="email" sortableKey="email" />
+              <ResizableHead
+                label="Address"
+                column="address"
+                sortableKey="address"
+                className="hidden xl:table-cell"
+              />
               <ResizableHead label="Notes" column="notes" />
               <TableHead className="sticky right-0 z-20 w-[100px] min-w-[100px] bg-background text-right shadow-[-8px_0_12px_-8px_rgba(0,0,0,0.35)]">
-                <button
-                  type="button"
-                  className="ml-auto flex items-center gap-1.5 font-medium hover:text-foreground"
-                  onClick={() => toggleSort("createdAt")}
-                >
-                  <span>Actions</span>
-                  {sortIcon("createdAt")}
-                </button>
+                Actions
               </TableHead>
             </TableRow>
           </TableHeader>
