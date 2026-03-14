@@ -2,6 +2,9 @@
   "name": "apollo",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=22.10.0 <23"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
