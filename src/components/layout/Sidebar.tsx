@@ -50,9 +50,9 @@ export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="w-64 shrink-0 border-r border-border bg-card hidden md:flex flex-col h-screen sticky top-0 overflow-y-auto">
+    <aside className="w-48 shrink-0 border-r border-border bg-card hidden md:flex flex-col h-screen sticky top-0 overflow-y-auto">
       {/* Logo */}
-      <div className="h-16 flex items-center gap-2 px-6 border-b border-border">
+      <div className="h-16 flex items-center gap-2 px-3 border-b border-border">
         <Phone className="h-6 w-6 text-primary" />
         <span className="text-xl font-bold text-foreground tracking-tight">
           Apollo
@@ -60,7 +60,7 @@ export function Sidebar() {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 py-4 px-3 space-y-1">
+      <nav className="flex-1 py-3 px-2 space-y-1">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive =
@@ -73,7 +73,7 @@ export function Sidebar() {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors",
+                "flex items-center gap-2 px-2.5 py-2.5 rounded-md text-sm font-medium transition-colors",
                 isActive
                   ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"

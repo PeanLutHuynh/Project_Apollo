@@ -62,7 +62,10 @@ export async function getAllContactsForUser(
 export async function getContactsForExport(
   userId: string
 ): Promise<
-  Pick<ContactDTO, "fullName" | "phoneNumber" | "email" | "address" | "notes">[]
+  Pick<
+    ContactDTO,
+    "fullName" | "phoneNumber" | "email" | "customerType" | "contactSource" | "address" | "notes"
+  >[]
 > {
   return db.contact.findMany({
     where: { userId },
@@ -70,6 +73,8 @@ export async function getContactsForExport(
       fullName: true,
       phoneNumber: true,
       email: true,
+      customerType: true,
+      contactSource: true,
       address: true,
       notes: true,
     },
@@ -158,6 +163,8 @@ export async function analyzeContactImport(
     seenKeys.add(importKey);
     readyToImport.push({
       fullName: row.fullName,
+      customerType: row.customerType,
+      contactSource: row.contactSource,
       address: row.address,
       phoneNumber: row.phoneNumber,
       email: row.email,
@@ -205,6 +212,24 @@ export async function deleteContact(
   userId: string
 ): Promise<void> {
   await db.contact.delete({ where: { id, userId } });
+}
+
+export async function deleteContactsBulk(
+  userId: string,
+  ids: string[]
+): Promise<number> {
+  if (ids.length === 0) {
+    return 0;
+  }
+
+  const result = await db.contact.deleteMany({
+    where: {
+      userId,
+      id: { in: ids },
+    },
+  });
+
+  return result.count;
 }
 
 export async function getContactCount(userId: string): Promise<number> {

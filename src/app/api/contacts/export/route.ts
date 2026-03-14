@@ -12,13 +12,23 @@ function escapeCsvValue(value: string): string {
 }
 
 function toCsv(rows: Array<Record<string, string>>): string {
-  const headers = ["Full Name", "Phone Number", "Email", "Address", "Notes"];
+  const headers = [
+    "Full Name",
+    "Customer Type",
+    "Contact Source",
+    "Phone Number",
+    "Email",
+    "Address",
+    "Notes",
+  ];
   const lines = [headers.join(",")];
 
   for (const row of rows) {
     lines.push(
       [
         escapeCsvValue(row["Full Name"] ?? ""),
+        escapeCsvValue(row["Customer Type"] ?? ""),
+        escapeCsvValue(row["Contact Source"] ?? ""),
         escapeCsvValue(row["Phone Number"] ?? ""),
         escapeCsvValue(row["Email"] ?? ""),
         escapeCsvValue(row["Address"] ?? ""),
@@ -39,6 +49,8 @@ export async function GET() {
   const contacts = await getContactsForExport(session.user.id);
   const data = contacts.map((contact) => ({
     "Full Name": contact.fullName,
+    "Customer Type": contact.customerType,
+    "Contact Source": contact.contactSource,
     "Phone Number": contact.phoneNumber,
     Email: contact.email,
     Address: contact.address ?? "",

@@ -1,6 +1,9 @@
 import "next-auth";
 import type { CommunicationType, CommunicationStatus } from "@prisma/client";
 
+export type CustomerType = "enterprise" | "personal" | "partner";
+export type ContactSource = "facebook" | "zalo" | "staff" | "other";
+
 // Extend NextAuth session to include id and role
 declare module "next-auth" {
   interface Session {
@@ -20,6 +23,8 @@ export interface ContactDTO {
   id: string;
   userId: string;
   fullName: string;
+  customerType: CustomerType;
+  contactSource: ContactSource;
   address: string | null;
   phoneNumber: string;
   email: string;
@@ -30,7 +35,13 @@ export interface ContactDTO {
 
 export type CreateContactInput = Pick<
   ContactDTO,
-  "fullName" | "address" | "phoneNumber" | "email" | "notes"
+  | "fullName"
+  | "customerType"
+  | "contactSource"
+  | "address"
+  | "phoneNumber"
+  | "email"
+  | "notes"
 >;
 export type UpdateContactInput = Partial<CreateContactInput>;
 

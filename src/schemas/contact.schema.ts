@@ -17,6 +17,12 @@ export const createContactSchema = z.object({
       "Phone must be a valid international number (e.g. +84xxxxxxxxx)"
     ),
   email: z.string().email("Must be a valid email address"),
+  customerType: z.enum(["enterprise", "personal", "partner"], {
+    errorMap: () => ({ message: "Customer type is required" }),
+  }),
+  contactSource: z.enum(["facebook", "zalo", "staff", "other"], {
+    errorMap: () => ({ message: "Contact source is required" }),
+  }),
   notes: z
     .string()
     .max(1000, "Notes must be under 1000 characters")

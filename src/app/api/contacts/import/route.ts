@@ -69,6 +69,41 @@ function normalizePhoneNumber(phone: string): string {
   return "+" + cleaned;
 }
 
+function normalizeCustomerType(value: string): "enterprise" | "personal" | "partner" | "" {
+  const normalized = normalizeHeader(value);
+
+  if (["enterprise", "business", "company", "doanhnghiep"].includes(normalized)) {
+    return "enterprise";
+  }
+  if (["personal", "individual", "person", "canhan"].includes(normalized)) {
+    return "personal";
+  }
+  if (["partner", "agency", "doitac"].includes(normalized)) {
+    return "partner";
+  }
+
+  return "";
+}
+
+function normalizeContactSource(value: string): "facebook" | "zalo" | "staff" | "other" | "" {
+  const normalized = normalizeHeader(value);
+
+  if (["facebook", "fb"].includes(normalized)) {
+    return "facebook";
+  }
+  if (normalized === "zalo") {
+    return "zalo";
+  }
+  if (["staff", "employee", "nhanvien", "sale", "sales"].includes(normalized)) {
+    return "staff";
+  }
+  if (["other", "khac"].includes(normalized)) {
+    return "other";
+  }
+
+  return "";
+}
+
 function mapRow(row: RawRow) {
   const rawPhone = getField(row, [
     "phonenumber",
@@ -79,7 +114,13 @@ function mapRow(row: RawRow) {
     "sdt",
   ]);
   return {
-    fullName: getField(row, ["fullname", "name", "contactname", "hoten"]),
+    fullName: getField(row, ["fullname", "name", "contactname", "hoten", "hovaten"]),
+    customerType: normalizeCustomerType(
+      getField(row, ["customertype", "customer", "loaikhachhang", "type"])
+    ),
+    contactSource: normalizeContactSource(
+      getField(row, ["contactsource", "source", "nguon", "nguonkhachhang", "kenh"])
+    ),
     phoneNumber: rawPhone ? normalizePhoneNumber(rawPhone) : "",
     email: getField(row, ["email", "mail"]),
     address: getField(row, ["address", "diachi"]),
@@ -135,7 +176,13 @@ async function parseImportFile(file: File) {
     .map((row, index) => ({ row: index + 2, ...mapRow(row) }))
     .filter(
       (row) =>
-        row.fullName || row.phoneNumber || row.email || row.address || row.notes
+        row.fullName ||
+        row.customerType ||
+        row.contactSource ||
+        row.phoneNumber ||
+        row.email ||
+        row.address ||
+        row.notes
     );
 
   if (candidateRows.length === 0) {
@@ -144,7 +191,7 @@ async function parseImportFile(file: File) {
         {
           success: false,
           error:
-            "No contact rows found. Use headers like Full Name, Phone Number, Email, Address, Notes.",
+            "No contact rows found. Use headers like Full Name, Customer Type, Contact Source, Phone Number, Email, Address, Notes.",
         },
         { status: 400 }
       ),
@@ -154,6 +201,8 @@ async function parseImportFile(file: File) {
   const validRows: Array<{
     row: number;
     fullName: string;
+    customerType: "enterprise" | "personal" | "partner";
+    contactSource: "facebook" | "zalo" | "staff" | "other";
     phoneNumber: string;
     email: string;
     address: string | null;
@@ -164,6 +213,8 @@ async function parseImportFile(file: File) {
   for (const row of candidateRows) {
     const parsed = createContactSchema.safeParse({
       fullName: row.fullName,
+      customerType: row.customerType,
+      contactSource: row.contactSource,
       phoneNumber: row.phoneNumber,
       email: row.email,
       address: row.address,
@@ -183,6 +234,8 @@ async function parseImportFile(file: File) {
     validRows.push({
       row: row.row,
       fullName: parsed.data.fullName,
+      customerType: parsed.data.customerType,
+      contactSource: parsed.data.contactSource,
       phoneNumber: parsed.data.phoneNumber,
       email: parsed.data.email,
       address: parsed.data.address ? parsed.data.address : null,
@@ -245,7 +298,9 @@ export async function POST(req: Request) {
         duplicateInFile: analysis.summary.duplicateInFile,
         readyToImport: analysis.summary.ready,
         supportedFields: [
-          "Full Name / Name / Ho Ten",
+          "Full Name / Name / Ho Ten / Ho Va Ten",
+          "Customer Type / Loai Khach Hang (Enterprise / Personal / Partner)",
+          "Contact Source / Nguon / Kenh (Facebook / Zalo / Staff / Other)",
           "Phone Number / Phone / Mobile / So Dien Thoai / SDT",
           "Email / Mail",
           "Address / Dia Chi",
@@ -253,6 +308,8 @@ export async function POST(req: Request) {
         ],
         sampleRow: {
           fullName: "Nguyen Van A",
+          customerType: "personal",
+          contactSource: "zalo",
           phoneNumber: "+84935205238",
           email: "nguyenvana@example.com",
           address: "Da Nang",

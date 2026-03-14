@@ -26,6 +26,19 @@ enum UserRole {
   admin
 }
 
+enum CustomerType {
+  enterprise
+  personal
+  partner
+}
+
+enum ContactSource {
+  facebook
+  zalo
+  staff
+  other
+}
+
 // ─── Models ───────────────────────────────────────────────────────────────────
 
 model User {
@@ -46,6 +59,8 @@ model Contact {
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   fullName    String
+  customerType CustomerType
+  contactSource ContactSource
   address     String?
   phoneNumber String
   email       String

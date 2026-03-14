@@ -9,6 +9,13 @@ import ImportContactsButton from "@/components/contacts/ImportContactsButton";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Form,
   FormControl,
   FormDescription,
@@ -37,6 +44,8 @@ export default function ContactForm({ defaultValues, contactId }: ContactFormPro
     resolver: zodResolver(createContactSchema),
     defaultValues: {
       fullName: defaultValues?.fullName ?? "",
+      customerType: defaultValues?.customerType ?? "personal",
+      contactSource: defaultValues?.contactSource ?? "other",
       address: defaultValues?.address ?? "",
       phoneNumber: defaultValues?.phoneNumber ?? "",
       email: defaultValues?.email ?? "",
@@ -81,6 +90,55 @@ export default function ContactForm({ defaultValues, contactId }: ContactFormPro
             </FormItem>
           )}
         />
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FormField
+            control={form.control}
+            name="customerType"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Customer Type *</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select customer type" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="enterprise">Enterprise</SelectItem>
+                    <SelectItem value="personal">Personal</SelectItem>
+                    <SelectItem value="partner">Partner</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="contactSource"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Contact Source *</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select contact source" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="facebook">Facebook</SelectItem>
+                    <SelectItem value="zalo">Zalo</SelectItem>
+                    <SelectItem value="staff">Staff</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <FormField

@@ -26,6 +26,8 @@ type PreviewData = {
   supportedFields: string[];
   sampleRow: {
     fullName: string;
+    customerType: string;
+    contactSource: string;
     phoneNumber: string;
     email: string;
     address: string;
@@ -42,6 +44,19 @@ export default function ImportContactsButton() {
   const [preview, setPreview] = useState<PreviewData | null>(null);
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+
+  async function parseApiResponse(res: Response): Promise<any> {
+    const text = await res.text();
+    if (!text) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new Error(text.slice(0, 200));
+    }
+  }
 
   async function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -61,7 +76,7 @@ export default function ImportContactsButton() {
         method: "POST",
         body: formData,
       });
-      const data = await res.json();
+      const data = await parseApiResponse(res);
 
       if (!res.ok) {
         const skipped = data.data?.invalidRows?.length
@@ -99,7 +114,7 @@ export default function ImportContactsButton() {
         method: "POST",
         body: formData,
       });
-      const data = await res.json();
+      const data = await parseApiResponse(res);
 
       if (!res.ok) {
         throw new Error(data.error ?? "Import failed");
@@ -147,9 +162,9 @@ export default function ImportContactsButton() {
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+        <DialogContent className="max-h-[92vh] w-[95vw] max-w-6xl overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Import Contacts From File</DialogTitle>
+            <DialogTitle>Import Contacts from File</DialogTitle>
             <DialogDescription>
               Upload a CSV or Excel file to import multiple contacts at once.
             </DialogDescription>
@@ -181,6 +196,8 @@ export default function ImportContactsButton() {
                   <thead className="bg-muted/50">
                     <tr>
                       <th className="px-3 py-2">Full Name</th>
+                      <th className="px-3 py-2">Customer Type</th>
+                      <th className="px-3 py-2">Contact Source</th>
                       <th className="px-3 py-2">Phone Number</th>
                       <th className="px-3 py-2">Email</th>
                       <th className="px-3 py-2">Address</th>
@@ -190,6 +207,8 @@ export default function ImportContactsButton() {
                   <tbody>
                     <tr>
                       <td className="px-3 py-2">{preview?.sampleRow.fullName ?? "Nguyen Van A"}</td>
+                      <td className="px-3 py-2">{preview?.sampleRow.customerType ?? "personal"}</td>
+                      <td className="px-3 py-2">{preview?.sampleRow.contactSource ?? "zalo"}</td>
                       <td className="px-3 py-2">{preview?.sampleRow.phoneNumber ?? "+84935205238"}</td>
                       <td className="px-3 py-2">{preview?.sampleRow.email ?? "nguyenvana@example.com"}</td>
                       <td className="px-3 py-2">{preview?.sampleRow.address ?? "Da Nang"}</td>
@@ -252,11 +271,11 @@ export default function ImportContactsButton() {
                     <p className="text-lg font-semibold">{preview.invalidRows.length}</p>
                   </div>
                   <div className="rounded-md border p-3">
-                    <p className="text-xs text-muted-foreground">Duplicate existing</p>
+                    <p className="text-xs text-muted-foreground">Existing duplicates</p>
                     <p className="text-lg font-semibold">{preview.duplicateExisting}</p>
                   </div>
                   <div className="rounded-md border p-3">
-                    <p className="text-xs text-muted-foreground">Duplicate in file</p>
+                    <p className="text-xs text-muted-foreground">Duplicates in file</p>
                     <p className="text-lg font-semibold">{preview.duplicateInFile}</p>
                   </div>
                 </div>

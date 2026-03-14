@@ -2,22 +2,11 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Download, Plus, Search } from "lucide-react";
+import { Download, Plus, RefreshCcw, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { getContacts } from "@/services/contact.service";
-import { getInitials, truncate } from "@/lib/utils";
-import { DeleteContactButton } from "@/components/contacts/DeleteContactButton";
+import ContactsTable from "@/components/contacts/ContactsTable";
 
 export const metadata = { title: "Contacts" };
 
@@ -63,14 +52,22 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
 
       {/* Search */}
       <form method="GET">
-        <div className="relative max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            name="search"
-            placeholder="Search by name, email, or phone..."
-            defaultValue={search ?? ""}
-            className="pl-9"
-          />
+        <div className="flex items-center gap-2">
+          <div className="relative w-full max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              name="search"
+              placeholder="Search by name, email, or phone..."
+              defaultValue={search ?? ""}
+              className="pl-9"
+            />
+          </div>
+          <Button variant="outline" type="button" asChild>
+            <Link href="/contacts">
+              <RefreshCcw className="mr-2 h-4 w-4" />
+              Refresh
+            </Link>
+          </Button>
         </div>
       </form>
 
@@ -88,54 +85,7 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
           )}
         </div>
       ) : (
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead className="hidden lg:table-cell">Address</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {contacts.map((contact) => (
-                <TableRow key={contact.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Avatar className="h-8 w-8">
-                        <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
-                          {getInitials(contact.fullName)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="font-medium">{contact.fullName}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {contact.phoneNumber}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {truncate(contact.email, 30)}
-                  </TableCell>
-                  <TableCell className="hidden lg:table-cell text-muted-foreground">
-                    {contact.address ? truncate(contact.address, 30) : (
-                      <Badge variant="outline" className="text-xs">No address</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button variant="outline" size="sm" asChild>
-                        <Link href={`/contacts/${contact.id}`}>Edit</Link>
-                      </Button>
-                      <DeleteContactButton id={contact.id} />
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        <ContactsTable contacts={contacts} />
       )}
 
       {/* Pagination */}
