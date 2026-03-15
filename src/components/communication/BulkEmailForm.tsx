@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Mail, Loader2, CheckCircle, XCircle, Users, X } from "lucide-react";
+import { Mail, Loader2, CheckCircle, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,10 +16,9 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { bulkEmailSchema, type BulkEmailFormValues } from "@/schemas/communication.schema";
 import { useBulkRecipientSelector } from "@/hooks/use-bulk-recipient-selector";
-import ConfirmActionDialog from "@/components/communication/ConfirmActionDialog";
+import RecipientPicker from "@/components/communication/RecipientPicker";
 
 export default function BulkEmailForm() {
   const [result, setResult] = useState<{
@@ -68,114 +67,28 @@ export default function BulkEmailForm() {
           control={form.control}
           name="contactIds"
           render={() => (
-            <FormItem>
-              <div className="flex items-center justify-between mb-2">
-                <FormLabel>Recipients</FormLabel>
-                <div className="flex items-center gap-2">
-                  {recipients.selectedCount > 0 && (
-                    <Badge variant="secondary">
-                      <Users className="mr-1 h-3 w-3" />
-                      {recipients.selectedCount} selected
-                    </Badge>
-                  )}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={recipients.toggleAll}
-                    disabled={recipients.results.length === 0}
-                  >
-                    {recipients.allSelected ? "Deselect Visible" : "Select Visible"}
-                  </Button>
-                </div>
-              </div>
-              <div ref={recipients.recipientBoxRef} className="space-y-2">
-                <Input
-                  placeholder="Search recipients by name, email, or phone..."
-                  value={recipients.query}
-                  onFocus={() => recipients.setIsSuggestionsOpen(true)}
-                  onChange={(event) => {
-                    recipients.setQuery(event.target.value);
-                    recipients.setIsSuggestionsOpen(true);
-                  }}
-                />
-                {recipients.isSuggestionsOpen && (
-                  <div className="h-48 overflow-y-auto rounded-md border p-2">
-                    {recipients.isLoading ? (
-                      <p className="text-sm text-muted-foreground text-center py-4">Searching...</p>
-                    ) : recipients.results.length === 0 ? (
-                      <p className="text-sm text-muted-foreground text-center py-4">
-                        No matching recipients
-                      </p>
-                    ) : (
-                      <div className="space-y-1">
-                        {recipients.results.map((contact) => (
-                          <div
-                            key={contact.id}
-                            className="flex items-center gap-2 rounded-sm px-2 py-1.5 hover:bg-accent cursor-pointer"
-                            onClick={() => recipients.toggleContact(contact.id)}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={recipients.selectedIds.includes(contact.id)}
-                              onChange={() => recipients.toggleContact(contact.id)}
-                              onClick={(e) => e.stopPropagation()}
-                              className="h-4 w-4 rounded border border-input accent-primary cursor-pointer"
-                            />
-                            <span className="text-sm font-medium flex-1">
-                              {contact.fullName}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {contact.email}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-              {recipients.selectedRecipientList.length > 0 && (
-                <div className="rounded-md border p-2">
-                  <p className="text-xs text-muted-foreground mb-2">Selected recipients</p>
-                  <div className="flex flex-wrap gap-2">
-                    {recipients.selectedRecipientList.slice(0, 6).map((recipient) => (
-                      <Badge key={recipient.id} variant="secondary" className="gap-1">
-                        <span>{recipient.fullName}</span>
-                        <button
-                          type="button"
-                          onClick={() => recipients.removeSelectedRecipient(recipient.id)}
-                          aria-label={`Remove ${recipient.fullName}`}
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </Badge>
-                    ))}
-                    {recipients.selectedRecipientList.length > 6 && (
-                      <Badge variant="outline">+{recipients.selectedRecipientList.length - 6} more</Badge>
-                    )}
-                  </div>
-                </div>
-              )}
-              {recipients.selectedRecipientList.length > 0 && (
-                <div className="flex justify-end">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onMouseDown={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      recipients.openClearSelectedConfirm();
-                    }}
-                    onClick={recipients.openClearSelectedConfirm}
-                  >
-                    Clear selected
-                  </Button>
-                </div>
-              )}
-              <FormMessage />
-            </FormItem>
+            <RecipientPicker
+              recipientBoxRef={recipients.recipientBoxRef}
+              query={recipients.query}
+              isSuggestionsOpen={recipients.isSuggestionsOpen}
+              isLoading={recipients.isLoading}
+              results={recipients.results}
+              selectedIds={recipients.selectedIds}
+              selectedRecipientList={recipients.selectedRecipientList}
+              selectedCount={recipients.selectedCount}
+              allSelected={recipients.allSelected}
+              confirmAction={recipients.confirmAction}
+              setQuery={recipients.setQuery}
+              setIsSuggestionsOpen={recipients.setIsSuggestionsOpen}
+              setConfirmAction={recipients.setConfirmAction}
+              toggleAll={recipients.toggleAll}
+              toggleContact={recipients.toggleContact}
+              removeSelectedRecipient={recipients.removeSelectedRecipient}
+              openClearSelectedConfirm={recipients.openClearSelectedConfirm}
+              onConfirmAction={recipients.onConfirmAction}
+              placeholder="Search recipients by name, email, or phone..."
+              secondaryField="email"
+            />
           )}
         />
 
@@ -240,18 +153,6 @@ export default function BulkEmailForm() {
           )}
         </Button>
       </form>
-      <ConfirmActionDialog
-        open={recipients.confirmAction !== null}
-        title={recipients.confirmAction === "deselect-visible" ? "Deselect Visible Recipients" : "Clear Selected Recipients"}
-        description={
-          recipients.confirmAction === "deselect-visible"
-            ? "This will remove only recipients in the current search result from your selection."
-            : `This will remove all ${recipients.selectedIds.length} selected recipient(s).`
-        }
-        confirmLabel={recipients.confirmAction === "deselect-visible" ? "Deselect Visible" : "Clear Selected"}
-        onCancel={() => recipients.setConfirmAction(null)}
-        onConfirm={recipients.onConfirmAction}
-      />
     </Form>
   );
 }

@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRecipientSearch, type RecipientOption } from "@/hooks/use-recipient-search";
 
-type ConfirmAction = "deselect-visible" | "clear-selected" | null;
+export type BulkRecipientSelectorConfirmAction =
+  | "deselect-visible"
+  | "clear-selected"
+  | null;
 
 type UseBulkRecipientSelectorOptions = {
   onSelectionChange: (ids: string[]) => void;
@@ -14,7 +17,7 @@ export function useBulkRecipientSelector({
   const { query, setQuery, results, isLoading } = useRecipientSearch(50, isSuggestionsOpen);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedRecipients, setSelectedRecipients] = useState<Record<string, RecipientOption>>({});
-  const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
+  const [confirmAction, setConfirmAction] = useState<BulkRecipientSelectorConfirmAction>(null);
   const recipientBoxRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -164,3 +167,5 @@ export function useBulkRecipientSelector({
     toggleContact,
   };
 }
+
+export type BulkRecipientSelectorState = ReturnType<typeof useBulkRecipientSelector>;
