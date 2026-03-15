@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { deleteContactsBulk } from "@/services/contact.service";
+import { deleteContactsBulk } from "@/services/contact-import.service";
 import { revalidatePath } from "next/cache";
 
 export async function POST(req: NextRequest) {

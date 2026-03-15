@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
+import { checkRequestRateLimit, createRateLimitErrorResponse } from "@/lib/rate-limit";
 
 const passwordSchema = z.object({
   currentPassword: z.string().min(1),
@@ -11,6 +12,14 @@ const passwordSchema = z.object({
 });
 
 export async function PUT(req: NextRequest) {
+  const limit = checkRequestRateLimit(req, "auth:password", {
+    maxRequests: 20,
+    windowMs: 15 * 60 * 1000,
+  });
+  if (!limit.allowed) {
+    return createRateLimitErrorResponse(limit.retryAfterSeconds);
+  }
+
   const session = await getServerSession(authOptions);
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

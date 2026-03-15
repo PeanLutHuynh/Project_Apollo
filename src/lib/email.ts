@@ -45,3 +45,21 @@ export async function sendEmail(
     return { success: false, error: errorMessage };
   }
 }
+
+export async function sendPasswordResetEmail(
+  to: string,
+  resetLink: string,
+  expiresInMinutes: number
+): Promise<EmailResult> {
+  const subject = "Reset your Apollo password";
+  const body = [
+    "We received a request to reset your Apollo account password.",
+    "",
+    `Click this link to continue: ${resetLink}`,
+    "",
+    `This link will expire in ${expiresInMinutes} minutes.`,
+    "If you did not request this, you can safely ignore this email.",
+  ].join("\n");
+
+  return sendEmail(to, subject, body);
+}

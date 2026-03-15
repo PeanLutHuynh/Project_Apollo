@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { getContactsForExport } from "@/services/contact.service";
+import { getContactsForExport } from "@/services/contact-import.service";
 
 function escapeCsvValue(value: string): string {
   if (/[,"\n\r]/.test(value)) {
@@ -67,6 +67,7 @@ export async function GET() {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="${fileName}"`,
       "Cache-Control": "no-store",
+      "X-Export-Count": String(contacts.length),
     },
   });
 }

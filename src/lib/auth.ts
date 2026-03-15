@@ -3,6 +3,9 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 
+const MAX_FAILED_LOGIN_ATTEMPTS = 5;
+const LOCKOUT_MINUTES = 15;
+
 export const authOptions: NextAuthOptions = {
   session: {
     strategy: "jwt",
@@ -20,18 +23,49 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
+        const normalizedEmail = credentials.email.trim().toLowerCase();
+
         const user = await db.user.findUnique({
-          where: { email: credentials.email },
+          where: { email: normalizedEmail },
         });
 
         if (!user) return null;
+
+        if (user.lockoutUntil && user.lockoutUntil.getTime() > Date.now()) {
+          return null;
+        }
 
         const isPasswordValid = await bcrypt.compare(
           credentials.password,
           user.password
         );
 
-        if (!isPasswordValid) return null;
+        if (!isPasswordValid) {
+          const nextFailedAttempts = user.failedLoginAttempts + 1;
+          const shouldLock = nextFailedAttempts >= MAX_FAILED_LOGIN_ATTEMPTS;
+
+          await db.user.update({
+            where: { id: user.id },
+            data: {
+              failedLoginAttempts: shouldLock ? 0 : nextFailedAttempts,
+              lockoutUntil: shouldLock
+                ? new Date(Date.now() + LOCKOUT_MINUTES * 60 * 1000)
+                : null,
+            },
+          });
+
+          return null;
+        }
+
+        if (user.failedLoginAttempts > 0 || user.lockoutUntil) {
+          await db.user.update({
+            where: { id: user.id },
+            data: {
+              failedLoginAttempts: 0,
+              lockoutUntil: null,
+            },
+          });
+        }
 
         return {
           id: user.id,

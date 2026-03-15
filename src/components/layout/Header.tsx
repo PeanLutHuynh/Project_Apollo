@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { getInitials } from "@/lib/utils";
+import { useLocalNotifications } from "@/hooks/use-local-notifications";
 
 interface HeaderProps {
   user: {
@@ -43,6 +44,18 @@ function ThemeToggle() {
 export function Header({ user }: HeaderProps) {
   const displayName = user.name ?? user.email ?? "User";
   const initials = getInitials(displayName);
+  const { items, unreadCount, markAllRead, clearAll } = useLocalNotifications();
+
+  function formatNotificationDateTime(value: number) {
+    return new Date(value).toLocaleString("vi-VN", {
+      hour12: false,
+      day: "2-digit",
+      month: "2-digit",
+      year: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
 
   return (
     <header className="h-16 border-b border-border bg-card flex items-center justify-between px-6 shrink-0">
@@ -55,9 +68,64 @@ export function Header({ user }: HeaderProps) {
       <div className="flex items-center gap-2 ml-auto">
         <ThemeToggle />
 
-        <Button variant="ghost" size="icon" aria-label="Notifications">
-          <Bell className="h-4 w-4" />
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" aria-label="Notifications" className="relative">
+              <Bell className="h-4 w-4" />
+              {unreadCount > 0 && (
+                <span className="absolute right-1 top-1 inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+              )}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-[22rem] max-w-[calc(100vw-1rem)]" align="end" forceMount>
+            <DropdownMenuLabel className="flex items-center justify-between gap-3">
+              <span className="whitespace-nowrap">Notification</span>
+              <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">
+                {unreadCount} news
+              </span>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+
+            {items.length === 0 ? (
+              <p className="px-2 py-3 text-sm text-muted-foreground">No notifications</p>
+            ) : (
+              <div className="max-h-72 space-y-1 overflow-y-auto px-1">
+                {items.slice(0, 8).map((item) => (
+                  <div key={item.id} className="rounded-sm border px-2 py-1.5 text-sm">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-medium leading-none">{item.title}</p>
+                      <span className="shrink-0 text-[11px] text-muted-foreground">
+                        {formatNotificationDateTime(item.createdAt)}
+                      </span>
+                    </div>
+                    <p
+                      className="mt-1 text-xs text-muted-foreground whitespace-nowrap"
+                      title={item.description}
+                    >
+                      {item.description}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="cursor-pointer"
+              onClick={() => markAllRead()}
+              disabled={items.length === 0 || unreadCount === 0}
+            >
+              Mark all as read
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="cursor-pointer"
+              onClick={() => clearAll()}
+              disabled={items.length === 0}
+            >
+              Clear notifications
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

@@ -1,279 +1,126 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import * as XLSX from "xlsx";
 import { authOptions } from "@/lib/auth";
-import { createContactSchema } from "@/schemas/contact.schema";
-import { analyzeContactImport, importContacts } from "@/services/contact.service";
+import { analyzeContactImport, importContacts } from "@/services/contact-import.service";
 import { revalidatePath } from "next/cache";
+import { parseImportFile, SAMPLE_ROW, SUPPORTED_FIELDS } from "./import-parser";
+import {
+  checkRequestRateLimit,
+  createRateLimitErrorResponse,
+} from "@/lib/rate-limit";
 
-type RawRow = Record<string, unknown>;
+const MAX_IMPORT_FILE_BYTES = 5 * 1024 * 1024; // 5MB
 
-function normalizeHeader(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, "");
+function getClientIp(req: NextRequest): string {
+  const forwarded = req.headers.get("x-forwarded-for");
+  if (forwarded) {
+    return forwarded.split(",")[0]?.trim() ?? "unknown";
+  }
+
+  return req.headers.get("x-real-ip") ?? "unknown";
 }
 
-function getField(row: RawRow, keys: string[]): string {
-  const entries = Object.entries(row);
-
-  for (const [key, value] of entries) {
-    if (keys.includes(normalizeHeader(key))) {
-      return normalizeImportedText(String(value ?? ""));
-    }
-  }
-
-  return "";
+function logImportEvent(event: string, metadata: Record<string, unknown>) {
+  console.log(
+    JSON.stringify({
+      event,
+      source: "api/contacts/import",
+      timestamp: new Date().toISOString(),
+      ...metadata,
+    })
+  );
 }
 
-function tryRepairVietnameseMojibake(value: string): string {
-  // Detect common mojibake patterns like "Huá»³nh", "TrÆ°á»ng".
-  if (!/(Ã|Â|Æ|Ä|á»|�)/.test(value)) {
-    return value;
-  }
+export async function POST(req: NextRequest) {
+  const clientIp = getClientIp(req);
 
-  try {
-    const repaired = Buffer.from(value, "latin1").toString("utf8");
-    return repaired.includes("�") ? value : repaired;
-  } catch {
-    return value;
-  }
-}
-
-function normalizeImportedText(value: string): string {
-  const trimmed = value.replace(/^\uFEFF/, "").trim();
-  if (!trimmed) {
-    return "";
-  }
-
-  return tryRepairVietnameseMojibake(trimmed);
-}
-
-function normalizePhoneNumber(phone: string): string {
-  let cleaned = phone.toString().replace(/[\s\-\(\.\)]/g, "");
-
-  if (cleaned.startsWith("+")) return cleaned;
-
-  // 0xxxxxxxxx → +84xxxxxxxxx
-  if (cleaned.startsWith("0") && cleaned.length === 10) {
-    return "+84" + cleaned.slice(1);
-  }
-
-  // 84xxxxxxxxx → +84xxxxxxxxx
-  if (cleaned.startsWith("84") && cleaned.length === 11) {
-    return "+" + cleaned;
-  }
-
-  return "+" + cleaned;
-}
-
-function normalizeCustomerType(value: string): "enterprise" | "personal" | "partner" | "" {
-  const normalized = normalizeHeader(value);
-
-  if (["enterprise", "business", "company", "doanhnghiep"].includes(normalized)) {
-    return "enterprise";
-  }
-  if (["personal", "individual", "person", "canhan"].includes(normalized)) {
-    return "personal";
-  }
-  if (["partner", "agency", "doitac"].includes(normalized)) {
-    return "partner";
-  }
-
-  return "";
-}
-
-function normalizeContactSource(value: string): "facebook" | "zalo" | "staff" | "other" | "" {
-  const normalized = normalizeHeader(value);
-
-  if (["facebook", "fb"].includes(normalized)) {
-    return "facebook";
-  }
-  if (normalized === "zalo") {
-    return "zalo";
-  }
-  if (["staff", "employee", "nhanvien", "sale", "sales"].includes(normalized)) {
-    return "staff";
-  }
-  if (["other", "khac"].includes(normalized)) {
-    return "other";
-  }
-
-  return "";
-}
-
-function mapRow(row: RawRow) {
-  const rawPhone = getField(row, [
-    "phonenumber",
-    "phone",
-    "mobile",
-    "mobilenumber",
-    "sodienthoai",
-    "sdt",
-  ]);
-  return {
-    fullName: getField(row, ["fullname", "name", "contactname", "hoten", "hovaten"]),
-    customerType: normalizeCustomerType(
-      getField(row, ["customertype", "customer", "loaikhachhang", "type"])
-    ),
-    contactSource: normalizeContactSource(
-      getField(row, ["contactsource", "source", "nguon", "nguonkhachhang", "kenh"])
-    ),
-    phoneNumber: rawPhone ? normalizePhoneNumber(rawPhone) : "",
-    email: getField(row, ["email", "mail"]),
-    address: getField(row, ["address", "diachi"]),
-    notes: getField(row, ["notes", "note", "ghichu"]),
-  };
-}
-
-function formatZodIssue(path: Array<string | number>, message: string): string {
-  const field = path[0] ? String(path[0]) : "row";
-  return `${field}: ${message}`;
-}
-
-async function parseImportFile(file: File) {
-  const fileName = file.name.toLowerCase();
-  if (!fileName.endsWith(".csv") && !fileName.endsWith(".xlsx") && !fileName.endsWith(".xls")) {
-    return {
-      error: NextResponse.json(
-        { success: false, error: "Only .csv, .xlsx, and .xls files are supported" },
-        { status: 400 }
-      ),
-    };
-  }
-
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const workbook = XLSX.read(buffer, { type: "buffer" });
-  const firstSheetName = workbook.SheetNames[0];
-
-  if (!firstSheetName) {
-    return {
-      error: NextResponse.json(
-        { success: false, error: "The uploaded file is empty" },
-        { status: 400 }
-      ),
-    };
-  }
-
-  const sheet = workbook.Sheets[firstSheetName];
-  if (!sheet) {
-    return {
-      error: NextResponse.json(
-        { success: false, error: "Unable to read the first sheet from the file" },
-        { status: 400 }
-      ),
-    };
-  }
-
-  const rawRows = XLSX.utils.sheet_to_json<RawRow>(sheet, {
-    defval: "",
-    raw: false,
+  const rateLimit = checkRequestRateLimit(req, "contacts-import", {
+    maxRequests: 10,
+    windowMs: 10 * 60 * 1000,
   });
-
-  const candidateRows = rawRows
-    .map((row, index) => ({ row: index + 2, ...mapRow(row) }))
-    .filter(
-      (row) =>
-        row.fullName ||
-        row.customerType ||
-        row.contactSource ||
-        row.phoneNumber ||
-        row.email ||
-        row.address ||
-        row.notes
-    );
-
-  if (candidateRows.length === 0) {
-    return {
-      error: NextResponse.json(
-        {
-          success: false,
-          error:
-            "No contact rows found. Use headers like Full Name, Customer Type, Contact Source, Phone Number, Email, Address, Notes.",
-        },
-        { status: 400 }
-      ),
-    };
+  if (!rateLimit.allowed) {
+    logImportEvent("import_rate_limited", {
+      ip: clientIp,
+      retryAfterSeconds: rateLimit.retryAfterSeconds,
+    });
+    return createRateLimitErrorResponse(rateLimit.retryAfterSeconds);
   }
 
-  const validRows: Array<{
-    row: number;
-    fullName: string;
-    customerType: "enterprise" | "personal" | "partner";
-    contactSource: "facebook" | "zalo" | "staff" | "other";
-    phoneNumber: string;
-    email: string;
-    address: string | null;
-    notes: string | null;
-  }> = [];
-  const invalidRows: Array<{ row: number; reason: string }> = [];
-
-  for (const row of candidateRows) {
-    const parsed = createContactSchema.safeParse({
-      fullName: row.fullName,
-      customerType: row.customerType,
-      contactSource: row.contactSource,
-      phoneNumber: row.phoneNumber,
-      email: row.email,
-      address: row.address,
-      notes: row.notes,
-    });
-
-    if (!parsed.success) {
-      invalidRows.push({
-        row: row.row,
-        reason: parsed.error.issues
-          .map((issue) => formatZodIssue(issue.path, issue.message))
-          .join("; "),
-      });
-      continue;
-    }
-
-    validRows.push({
-      row: row.row,
-      fullName: parsed.data.fullName,
-      customerType: parsed.data.customerType,
-      contactSource: parsed.data.contactSource,
-      phoneNumber: parsed.data.phoneNumber,
-      email: parsed.data.email,
-      address: parsed.data.address ? parsed.data.address : null,
-      notes: parsed.data.notes ? parsed.data.notes : null,
-    });
-  }
-
-  return {
-    candidateRows,
-    validRows,
-    invalidRows,
-  };
-}
-
-export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
   if (!session) {
+    logImportEvent("import_unauthorized", {
+      ip: clientIp,
+    });
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const formData = await req.formData();
   const file = formData.get("file");
+  const mode = formData.get("mode") === "preview" ? "preview" : "import";
 
   if (!(file instanceof File)) {
+    logImportEvent("import_invalid_payload", {
+      userId: session.user.id,
+      ip: clientIp,
+      mode,
+      reason: "missing_file",
+    });
     return NextResponse.json(
       { success: false, error: "Please choose a CSV or XLSX file" },
       { status: 400 }
     );
   }
-  const mode = formData.get("mode") === "preview" ? "preview" : "import";
+
+  logImportEvent("import_attempt", {
+    userId: session.user.id,
+    ip: clientIp,
+    mode,
+    fileName: file.name,
+    fileSize: file.size,
+  });
+
+  if (file.size > MAX_IMPORT_FILE_BYTES) {
+    logImportEvent("import_rejected", {
+      userId: session.user.id,
+      ip: clientIp,
+      mode,
+      fileName: file.name,
+      fileSize: file.size,
+      reason: "file_too_large",
+      maxBytes: MAX_IMPORT_FILE_BYTES,
+    });
+    return NextResponse.json(
+      {
+        success: false,
+        error: "File too large. Maximum allowed size is 5MB.",
+      },
+      { status: 413 }
+    );
+  }
+
   const parsedFile = await parseImportFile(file);
   if ("error" in parsedFile) {
+    logImportEvent("import_parse_rejected", {
+      userId: session.user.id,
+      ip: clientIp,
+      mode,
+      fileName: file.name,
+      fileSize: file.size,
+    });
     return parsedFile.error;
   }
 
   const { candidateRows, validRows, invalidRows } = parsedFile;
 
   if (validRows.length === 0) {
+    logImportEvent("import_no_valid_rows", {
+      userId: session.user.id,
+      ip: clientIp,
+      mode,
+      fileName: file.name,
+      detected: candidateRows.length,
+      invalidRows: invalidRows.length,
+    });
     return NextResponse.json(
       {
         success: false,
@@ -287,6 +134,18 @@ export async function POST(req: Request) {
   const analysis = await analyzeContactImport(session.user.id, validRows);
 
   if (mode === "preview") {
+    logImportEvent("import_preview_success", {
+      userId: session.user.id,
+      ip: clientIp,
+      fileName: file.name,
+      detected: candidateRows.length,
+      validRows: validRows.length,
+      invalidRows: invalidRows.length,
+      duplicateExisting: analysis.summary.duplicateExisting,
+      duplicateInFile: analysis.summary.duplicateInFile,
+      readyToImport: analysis.summary.ready,
+    });
+
     return NextResponse.json({
       success: true,
       data: {
@@ -297,24 +156,8 @@ export async function POST(req: Request) {
         duplicateExisting: analysis.summary.duplicateExisting,
         duplicateInFile: analysis.summary.duplicateInFile,
         readyToImport: analysis.summary.ready,
-        supportedFields: [
-          "Full Name / Name / Ho Ten / Ho Va Ten",
-          "Customer Type / Loai Khach Hang (Enterprise / Personal / Partner)",
-          "Contact Source / Nguon / Kenh (Facebook / Zalo / Staff / Other)",
-          "Phone Number / Phone / Mobile / So Dien Thoai / SDT",
-          "Email / Mail",
-          "Address / Dia Chi",
-          "Notes / Note / Ghi Chu",
-        ],
-        sampleRow: {
-          fullName: "Nguyen Van A",
-          customerType: "personal",
-          contactSource: "zalo",
-          phoneNumber: "+84935205238",
-          email: "nguyenvana@example.com",
-          address: "Da Nang",
-          notes: "VIP customer",
-        },
+        supportedFields: SUPPORTED_FIELDS,
+        sampleRow: SAMPLE_ROW,
         skippedRows: [...analysis.skipped, ...invalidRows].slice(0, 10),
       },
     });
@@ -322,6 +165,19 @@ export async function POST(req: Request) {
 
   const result = await importContacts(session.user.id, validRows);
   revalidatePath("/contacts");
+
+  logImportEvent("import_commit_success", {
+    userId: session.user.id,
+    ip: clientIp,
+    fileName: file.name,
+    detected: candidateRows.length,
+    validRows: validRows.length,
+    invalidRows: invalidRows.length,
+    imported: result.imported,
+    duplicateExisting: analysis.summary.duplicateExisting,
+    duplicateInFile: analysis.summary.duplicateInFile,
+    skippedRows: result.skipped.length + invalidRows.length,
+  });
 
   return NextResponse.json({
     success: true,

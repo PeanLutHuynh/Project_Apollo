@@ -47,11 +47,29 @@ model User {
   password  String
   name      String?
   role      UserRole  @default(user)
+  failedLoginAttempts Int @default(0)
+  lockoutUntil DateTime?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
   contacts       Contact[]
   communications Communication[]
+  passwordResetTokens PasswordResetToken[]
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([usedAt])
 }
 
 model Contact {
