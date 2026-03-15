@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { authOptions } from "@/lib/auth";
-import { updateContactsBulkField } from "@/services/contact.service";
+import { updateContactsBulkField } from "@/services/contact-import.service";
 
 const bulkUpdateSchema = z.object({
   field: z.enum(["customerType", "contactSource", "address", "notes"]),
