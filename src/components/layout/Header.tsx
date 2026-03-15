@@ -77,10 +77,12 @@ export function Header({ user }: HeaderProps) {
               )}
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-90 max-w-[calc(100vw-1rem)]" align="end" forceMount>
-            <DropdownMenuLabel className="flex items-center justify-between">
-              <span>Notification</span>
-              <span className="text-xs text-muted-foreground">{unreadCount} news</span>
+          <DropdownMenuContent className="w-[22rem] max-w-[calc(100vw-1rem)]" align="end" forceMount>
+            <DropdownMenuLabel className="flex items-center justify-between gap-3">
+              <span className="whitespace-nowrap">Notification</span>
+              <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">
+                {unreadCount} news
+              </span>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
 
