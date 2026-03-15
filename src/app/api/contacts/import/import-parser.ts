@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
+import { parse as parseCsv } from "csv-parse/sync";
 import { createContactSchema } from "@/schemas/contact.schema";
 
 type RawRow = Record<string, unknown>;
@@ -49,6 +50,14 @@ export const SAMPLE_ROW = {
   address: "Da Nang",
   notes: "VIP customer",
 };
+
+function normalizeFileExt(fileName: string): "csv" | "xlsx" | "xls" | "other" {
+  const lowered = fileName.toLowerCase();
+  if (lowered.endsWith(".csv")) return "csv";
+  if (lowered.endsWith(".xlsx")) return "xlsx";
+  if (lowered.endsWith(".xls")) return "xls";
+  return "other";
+}
 
 function normalizeHeader(value: string): string {
   return value
@@ -173,25 +182,89 @@ function formatZodIssue(path: Array<string | number>, message: string): string {
   return `${field}: ${message}`;
 }
 
+async function parseXlsxRows(bytes: Uint8Array): Promise<RawRow[]> {
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(Buffer.from(bytes) as any);
+
+  const sheet = workbook.worksheets[0];
+  if (!sheet) {
+    return [];
+  }
+
+  const headerRow = sheet.getRow(1);
+  const headers: string[] = [];
+
+  for (let col = 1; col <= headerRow.cellCount; col += 1) {
+    headers.push(String(headerRow.getCell(col).text ?? "").trim());
+  }
+
+  if (headers.every((header) => header === "")) {
+    return [];
+  }
+
+  const rows: RawRow[] = [];
+  for (let rowIndex = 2; rowIndex <= sheet.rowCount; rowIndex += 1) {
+    const excelRow = sheet.getRow(rowIndex);
+    const row: RawRow = {};
+
+    for (let col = 1; col <= headers.length; col += 1) {
+      const header = headers[col - 1];
+      if (!header) {
+        continue;
+      }
+
+      row[header] = String(excelRow.getCell(col).text ?? "");
+    }
+
+    rows.push(row);
+  }
+
+  return rows;
+}
+
+function parseCsvRows(buffer: Buffer): RawRow[] {
+  return parseCsv(buffer, {
+    bom: true,
+    columns: true,
+    skip_empty_lines: true,
+    trim: true,
+    relax_column_count: true,
+  }) as RawRow[];
+}
+
 export async function parseImportFile(file: File): Promise<
   | { error: NextResponse }
   | { candidateRows: ImportCandidateRow[]; validRows: ImportValidRow[]; invalidRows: InvalidRow[] }
 > {
-  const fileName = file.name.toLowerCase();
-  if (!fileName.endsWith(".csv") && !fileName.endsWith(".xlsx") && !fileName.endsWith(".xls")) {
+  const ext = normalizeFileExt(file.name);
+  if (ext === "other") {
     return {
       error: NextResponse.json(
-        { success: false, error: "Only .csv, .xlsx, and .xls files are supported" },
+        { success: false, error: "Only .csv and .xlsx files are supported" },
         { status: 400 }
       ),
     };
   }
 
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const workbook = XLSX.read(buffer, { type: "buffer" });
-  const firstSheetName = workbook.SheetNames[0];
+  if (ext === "xls") {
+    return {
+      error: NextResponse.json(
+        {
+          success: false,
+          error: "Legacy .xls files are not supported. Please convert to .xlsx or .csv.",
+        },
+        { status: 400 }
+      ),
+    };
+  }
 
-  if (!firstSheetName) {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const rawRows =
+    ext === "csv"
+      ? parseCsvRows(Buffer.from(bytes))
+      : await parseXlsxRows(bytes);
+
+  if (rawRows.length === 0) {
     return {
       error: NextResponse.json(
         { success: false, error: "The uploaded file is empty" },
@@ -199,21 +272,6 @@ export async function parseImportFile(file: File): Promise<
       ),
     };
   }
-
-  const sheet = workbook.Sheets[firstSheetName];
-  if (!sheet) {
-    return {
-      error: NextResponse.json(
-        { success: false, error: "Unable to read the first sheet from the file" },
-        { status: 400 }
-      ),
-    };
-  }
-
-  const rawRows = XLSX.utils.sheet_to_json<RawRow>(sheet, {
-    defval: "",
-    raw: false,
-  });
 
   const candidateRows = rawRows
     .map((row, index) => ({ ...mapRow(row), row: index + 2 }))

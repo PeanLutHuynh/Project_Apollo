@@ -139,7 +139,7 @@ export default function ImportContactsButton() {
       <input
         ref={inputRef}
         type="file"
-        accept=".csv,.xlsx,.xls"
+        accept=".csv,.xlsx"
         className="hidden"
         onChange={handleFileChange}
       />
