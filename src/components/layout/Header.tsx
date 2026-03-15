@@ -91,15 +91,15 @@ export function Header({ user }: HeaderProps) {
             ) : (
               <div className="max-h-72 space-y-1 overflow-y-auto px-1">
                 {items.slice(0, 8).map((item) => (
-                  <div key={item.id} className="rounded-sm border px-2 py-1.5 text-sm">
+                  <div key={item.id} className="rounded-sm border px-2 py-1.5 text-sm overflow-hidden">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="font-medium leading-none">{item.title}</p>
+                      <p className="min-w-0 flex-1 break-words font-medium leading-snug">{item.title}</p>
                       <span className="shrink-0 text-[11px] text-muted-foreground">
                         {formatNotificationDateTime(item.createdAt)}
                       </span>
                     </div>
                     <p
-                      className="mt-1 text-xs text-muted-foreground whitespace-nowrap"
+                      className="mt-1 whitespace-normal break-words text-xs leading-5 text-muted-foreground"
                       title={item.description}
                     >
                       {item.description}
