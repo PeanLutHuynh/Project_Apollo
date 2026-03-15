@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createPasswordResetToken } from "@/services/auth.service";
 import { sendPasswordResetEmail } from "@/lib/email";
+import { checkRequestRateLimit, createRateLimitErrorResponse } from "@/lib/rate-limit";
 
 const forgotPasswordSchema = z.object({
   email: z.string().email("Please enter a valid email"),
@@ -10,6 +11,14 @@ const forgotPasswordSchema = z.object({
 const TOKEN_LIFETIME_MINUTES = 15;
 
 export async function POST(req: NextRequest) {
+  const limit = checkRequestRateLimit(req, "auth:forgot-password", {
+    maxRequests: 6,
+    windowMs: 15 * 60 * 1000,
+  });
+  if (!limit.allowed) {
+    return createRateLimitErrorResponse(limit.retryAfterSeconds);
+  }
+
   try {
     const body = await req.json();
     const parsed = forgotPasswordSchema.safeParse(body);

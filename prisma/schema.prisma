@@ -47,6 +47,8 @@ model User {
   password  String
   name      String?
   role      UserRole  @default(user)
+  failedLoginAttempts Int @default(0)
+  lockoutUntil DateTime?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 

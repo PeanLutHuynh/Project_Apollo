@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { resetPasswordWithToken, validatePasswordResetToken } from "@/services/auth.service";
+import { checkRequestRateLimit, createRateLimitErrorResponse } from "@/lib/rate-limit";
 
 const resetPasswordSchema = z.object({
   token: z.string().min(1, "Token is required"),
@@ -15,6 +16,14 @@ function mapResetError(reason?: "invalid-token" | "token-expired" | "token-used"
 }
 
 export async function GET(req: NextRequest) {
+  const limit = checkRequestRateLimit(req, "auth:reset-password:get", {
+    maxRequests: 20,
+    windowMs: 15 * 60 * 1000,
+  });
+  if (!limit.allowed) {
+    return createRateLimitErrorResponse(limit.retryAfterSeconds);
+  }
+
   const token = req.nextUrl.searchParams.get("token") ?? "";
 
   if (!token) {
@@ -33,6 +42,14 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const limit = checkRequestRateLimit(req, "auth:reset-password:post", {
+    maxRequests: 10,
+    windowMs: 15 * 60 * 1000,
+  });
+  if (!limit.allowed) {
+    return createRateLimitErrorResponse(limit.retryAfterSeconds);
+  }
+
   try {
     const body = await req.json();
     const parsed = resetPasswordSchema.safeParse(body);
