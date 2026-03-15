@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowDown, ArrowUp, ArrowUpDown, Loader2, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Loader2, Pencil, Trash2, X } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,9 +16,25 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { DeleteContactButton } from "@/components/contacts/DeleteContactButton";
 import { useToast } from "@/hooks/use-toast";
 import { getInitials, truncate } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Tooltip,
   TooltipContent,
@@ -46,6 +62,8 @@ type SortState = {
   key: SortKey;
   direction: "asc" | "desc";
 };
+
+type BulkEditField = "customerType" | "contactSource" | "address" | "notes";
 
 const MIN_WIDTHS: Record<ResizableColumn, number> = {
   name: 160,
@@ -95,11 +113,37 @@ function compareText(a: string, b: string): number {
   return a.localeCompare(b, "en", { sensitivity: "base" });
 }
 
+function bulkFieldLabel(field: BulkEditField): string {
+  if (field === "customerType") return "Customer Type";
+  if (field === "contactSource") return "Source";
+  if (field === "address") return "Address";
+  return "Notes";
+}
+
+function contactFieldDisplayValue(contact: ContactDTO, field: BulkEditField): string {
+  if (field === "customerType") return customerTypeLabel(contact.customerType);
+  if (field === "contactSource") return sourceLabel(contact.contactSource);
+  if (field === "address") return contact.address ?? "-";
+  return contact.notes ?? "-";
+}
+
+function contactFieldRawValue(contact: ContactDTO, field: BulkEditField): string {
+  if (field === "customerType") return contact.customerType;
+  if (field === "contactSource") return contact.contactSource;
+  if (field === "address") return contact.address ?? "";
+  return contact.notes ?? "";
+}
+
 export default function ContactsTable({ contacts }: ContactsTableProps) {
   const router = useRouter();
   const { toast } = useToast();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isDeletingBulk, setIsDeletingBulk] = useState(false);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkEditOpen, setBulkEditOpen] = useState(false);
+  const [isEditingBulk, setIsEditingBulk] = useState(false);
+  const [bulkEditField, setBulkEditField] = useState<BulkEditField | "">("");
+  const [bulkEditValues, setBulkEditValues] = useState<Record<string, string>>({});
   const [isCompact, setIsCompact] = useState(false);
   const [isHeaderHovered, setIsHeaderHovered] = useState(false);
   const [sort, setSort] = useState<SortState>({ key: "name", direction: "asc" });
@@ -161,6 +205,11 @@ export default function ContactsTable({ contacts }: ContactsTableProps) {
     [selectedVisibleCount, visibleContacts.length]
   );
 
+  const selectedContacts = useMemo(
+    () => contacts.filter((contact) => selectedIds.includes(contact.id)),
+    [contacts, selectedIds]
+  );
+
   function toggleAll(checked: boolean) {
     if (!checked) {
       setSelectedIds((prev) => prev.filter((id) => !visibleIdSet.has(id)));
@@ -205,6 +254,7 @@ export default function ContactsTable({ contacts }: ContactsTableProps) {
         description: `${deleted} contact(s) deleted successfully.`,
       });
       setSelectedIds([]);
+      setBulkDeleteOpen(false);
       router.refresh();
     } catch (error) {
       toast({
@@ -216,6 +266,105 @@ export default function ContactsTable({ contacts }: ContactsTableProps) {
     } finally {
       setIsDeletingBulk(false);
     }
+  }
+
+  async function handleBulkEdit() {
+    if (selectedIds.length === 0) {
+      return;
+    }
+
+    if (!bulkEditField) {
+      toast({
+        variant: "destructive",
+        title: "Field is required",
+        description: "Please choose one field to edit.",
+      });
+      return;
+    }
+
+    const updates = selectedContacts
+      .map((contact) => {
+        const nextValue = (bulkEditValues[contact.id] ?? "").trim();
+        const currentValue = contactFieldRawValue(contact, bulkEditField).trim();
+
+        if (nextValue === "" && (bulkEditField === "address" || bulkEditField === "notes")) {
+          return null;
+        }
+
+        if (nextValue === currentValue) {
+          return null;
+        }
+
+        return { id: contact.id, value: nextValue };
+      })
+      .filter((item): item is { id: string; value: string } => item !== null);
+
+    if (updates.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "No changes detected",
+        description: "Please update at least one selected row.",
+      });
+      return;
+    }
+
+    setIsEditingBulk(true);
+    try {
+      const res = await fetch("/api/contacts/bulk-update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          field: bulkEditField,
+          updates,
+        }),
+      });
+      const payload = await res.json();
+
+      if (!res.ok || !payload.success) {
+        throw new Error(payload.error ?? "Failed to update selected contacts");
+      }
+
+      const updated = payload.data?.updated ?? 0;
+      toast({
+        title: "Bulk edit completed",
+        description: `${updated} contact(s) updated successfully.`,
+      });
+
+      setBulkEditOpen(false);
+      setBulkEditField("");
+      setBulkEditValues({});
+      router.refresh();
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Bulk edit failed",
+        description:
+          error instanceof Error ? error.message : "Unable to update selected contacts",
+      });
+    } finally {
+      setIsEditingBulk(false);
+    }
+  }
+
+  function handleOpenBulkEdit() {
+    if (selectedVisibleCount === 0) {
+      return;
+    }
+
+    setBulkEditField("");
+    setBulkEditValues({});
+    setBulkEditOpen(true);
+  }
+
+  function handleBulkFieldChange(value: string) {
+    const nextField = value as BulkEditField;
+    setBulkEditField(nextField);
+    setBulkEditValues(
+      selectedContacts.reduce<Record<string, string>>((acc, contact) => {
+        acc[contact.id] = contactFieldRawValue(contact, nextField);
+        return acc;
+      }, {})
+    );
   }
 
   function startResize(event: React.MouseEvent<HTMLSpanElement>, key: ResizableColumn) {
@@ -365,32 +514,6 @@ export default function ContactsTable({ contacts }: ContactsTableProps) {
   return (
     <TooltipProvider>
       <div className="space-y-3">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">
-          {selectedVisibleCount > 0
-            ? `${selectedVisibleCount} contact(s) selected`
-            : "Select contacts to delete in bulk. Use mouse wheel on header to scroll horizontally"}
-        </p>
-        <div className="flex items-center gap-2">
-          <p className="text-sm text-muted-foreground">
-            Showing {visibleContacts.length} of {contacts.length}
-          </p>
-          {(customerTypeFilter !== "all" || sourceFilter !== "all") && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setCustomerTypeFilter("all");
-                setSourceFilter("all");
-              }}
-            >
-              Clear Filters
-            </Button>
-          )}
-        </div>
-      </div>
-
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-xs text-muted-foreground">Customer Type:</span>
         {(["all", "enterprise", "personal", "partner"] as const).map((value) => (
@@ -456,33 +579,67 @@ export default function ContactsTable({ contacts }: ContactsTableProps) {
       )}
 
       <div className="flex items-center justify-between gap-3">
-        <Button
-          type="button"
-          variant="destructive"
-          size="sm"
-          disabled={selectedVisibleCount === 0 || isDeletingBulk}
-          onClick={handleBulkDelete}
-        >
-          {isDeletingBulk ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Deleting...
-            </>
-          ) : (
-            <>
-              <Trash2 className="mr-2 h-4 w-4" />
-              Delete Selected
-            </>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="destructive"
+            size="sm"
+            disabled={selectedVisibleCount === 0 || isDeletingBulk}
+            onClick={() => setBulkDeleteOpen(true)}
+          >
+            {isDeletingBulk ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Deleting...
+              </>
+            ) : (
+              <>
+                <Trash2 className="mr-2 h-4 w-4" />
+                {selectedVisibleCount > 0
+                  ? `Delete ${selectedVisibleCount} contact(s)`
+                  : "Delete Selected"}
+              </>
+            )}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={selectedVisibleCount === 0 || isEditingBulk}
+            onClick={handleOpenBulkEdit}
+          >
+            <Pencil className="mr-2 h-4 w-4" />
+            {selectedVisibleCount > 0
+              ? `Edit ${selectedVisibleCount} contact(s)`
+              : "Edit Selected"}
+          </Button>
+        </div>
+        <div className="flex items-center gap-2">
+          <p className="text-sm text-muted-foreground">
+            Showing {visibleContacts.length} of {contacts.length}
+          </p>
+          {(customerTypeFilter !== "all" || sourceFilter !== "all") && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setCustomerTypeFilter("all");
+                setSourceFilter("all");
+              }}
+            >
+              Clear Filters
+            </Button>
           )}
-        </Button>
-        <Button
-          type="button"
-          variant={isCompact ? "default" : "outline"}
-          size="sm"
-          onClick={() => setIsCompact((prev) => !prev)}
-        >
-          {isCompact ? "Comfortable Density" : "Compact Density"}
-        </Button>
+          <Button
+            type="button"
+            variant={isCompact ? "default" : "outline"}
+            size="sm"
+            onClick={() => setIsCompact((prev) => !prev)}
+          >
+            {isCompact ? "Comfortable Density" : "Compact Density"}
+          </Button>
+        </div>
       </div>
 
       <div ref={tableRootRef} className="rounded-md border">
@@ -670,6 +827,157 @@ export default function ContactsTable({ contacts }: ContactsTableProps) {
           </TableBody>
         </Table>
       </div>
+
+      <Dialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Selected Contacts</DialogTitle>
+            <DialogDescription>
+              This action cannot be undone. {selectedVisibleCount} selected contact(s) will be permanently deleted.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkDeleteOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleBulkDelete}
+              disabled={selectedVisibleCount === 0 || isDeletingBulk}
+            >
+              {isDeletingBulk ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={bulkEditOpen} onOpenChange={setBulkEditOpen}>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle>Edit Selected Contacts</DialogTitle>
+            <DialogDescription>
+              Choose one field, then update values per selected contact.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 overflow-y-auto pr-1">
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Field to edit</p>
+              <Select
+                value={bulkEditField || undefined}
+                onValueChange={handleBulkFieldChange}
+              >
+                <SelectTrigger className="focus-visible:ring-0 focus-visible:ring-offset-0 focus:ring-0 focus:ring-offset-0">
+                  <SelectValue placeholder="Select one field" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="customerType">Customer Type</SelectItem>
+                  <SelectItem value="contactSource">Source</SelectItem>
+                  <SelectItem value="address">Address</SelectItem>
+                  <SelectItem value="notes">Notes</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {bulkEditField && (
+              <div className="max-h-[45vh] overflow-auto rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Current {bulkFieldLabel(bulkEditField)}</TableHead>
+                      <TableHead>New {bulkFieldLabel(bulkEditField)}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {selectedContacts.map((contact) => (
+                      <TableRow key={contact.id}>
+                        <TableCell className="font-medium">{contact.fullName}</TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {contactFieldDisplayValue(contact, bulkEditField)}
+                        </TableCell>
+                        <TableCell>
+                          {bulkEditField === "customerType" ? (
+                            <Select
+                              value={bulkEditValues[contact.id] ?? "personal"}
+                              onValueChange={(value) =>
+                                setBulkEditValues((prev) => ({ ...prev, [contact.id]: value }))
+                              }
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select customer type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="enterprise">Enterprise</SelectItem>
+                                <SelectItem value="personal">Personal</SelectItem>
+                                <SelectItem value="partner">Partner</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          ) : bulkEditField === "contactSource" ? (
+                            <Select
+                              value={bulkEditValues[contact.id] ?? "other"}
+                              onValueChange={(value) =>
+                                setBulkEditValues((prev) => ({ ...prev, [contact.id]: value }))
+                              }
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select source" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="facebook">Facebook</SelectItem>
+                                <SelectItem value="zalo">Zalo</SelectItem>
+                                <SelectItem value="staff">Staff</SelectItem>
+                                <SelectItem value="other">Other</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <Input
+                              value={bulkEditValues[contact.id] ?? ""}
+                              onChange={(event) =>
+                                setBulkEditValues((prev) => ({
+                                  ...prev,
+                                  [contact.id]: event.target.value,
+                                }))
+                              }
+                              placeholder={`Enter new ${bulkFieldLabel(bulkEditField).toLowerCase()}`}
+                            />
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkEditOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleBulkEdit}
+              disabled={selectedVisibleCount === 0 || isEditingBulk}
+            >
+              {isEditingBulk ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Apply"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
     </TooltipProvider>
   );

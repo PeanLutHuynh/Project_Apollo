@@ -113,14 +113,16 @@ function mapRow(row: RawRow) {
     "sodienthoai",
     "sdt",
   ]);
+
+  const rawCustomerType = getField(row, ["customertype", "customer", "loaikhachhang", "type"]);
+  const rawContactSource = getField(row, ["contactsource", "source", "nguon", "nguonkhachhang", "kenh"]);
+
   return {
     fullName: getField(row, ["fullname", "name", "contactname", "hoten", "hovaten"]),
-    customerType: normalizeCustomerType(
-      getField(row, ["customertype", "customer", "loaikhachhang", "type"])
-    ),
-    contactSource: normalizeContactSource(
-      getField(row, ["contactsource", "source", "nguon", "nguonkhachhang", "kenh"])
-    ),
+    rawCustomerType,
+    rawContactSource,
+    customerType: normalizeCustomerType(rawCustomerType),
+    contactSource: normalizeContactSource(rawContactSource),
     phoneNumber: rawPhone ? normalizePhoneNumber(rawPhone) : "",
     email: getField(row, ["email", "mail"]),
     address: getField(row, ["address", "diachi"]),
@@ -211,6 +213,28 @@ async function parseImportFile(file: File) {
   const invalidRows: Array<{ row: number; reason: string }> = [];
 
   for (const row of candidateRows) {
+    const enumErrors: string[] = [];
+
+    if (row.rawCustomerType && !row.customerType) {
+      enumErrors.push(
+        `customerType not valid (label: ${row.rawCustomerType}). Valid values: enterprise | personal | partner`
+      );
+    }
+
+    if (row.rawContactSource && !row.contactSource) {
+      enumErrors.push(
+        `contactSource not valid (label: ${row.rawContactSource}). Valid values: facebook | zalo | staff | other`
+      );
+    }
+
+    if (enumErrors.length > 0) {
+      invalidRows.push({
+        row: row.row,
+        reason: enumErrors.join("; "),
+      });
+      continue;
+    }
+
     const parsed = createContactSchema.safeParse({
       fullName: row.fullName,
       customerType: row.customerType,
@@ -299,8 +323,8 @@ export async function POST(req: Request) {
         readyToImport: analysis.summary.ready,
         supportedFields: [
           "Full Name / Name / Ho Ten / Ho Va Ten",
-          "Customer Type / Loai Khach Hang (Enterprise / Personal / Partner)",
-          "Contact Source / Nguon / Kenh (Facebook / Zalo / Staff / Other)",
+          "Customer Type / Loai Khach Hang (enterprise | personal | partner)",
+          "Contact Source / Nguon / Kenh (facebook | zalo | staff | other)",
           "Phone Number / Phone / Mobile / So Dien Thoai / SDT",
           "Email / Mail",
           "Address / Dia Chi",

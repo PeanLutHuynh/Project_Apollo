@@ -2,11 +2,12 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Download, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getContacts } from "@/services/contact.service";
 import ContactsTable from "@/components/contacts/ContactsTable";
 import ContactsSearchBar from "@/components/contacts/ContactsSearchBar";
+import ExportContactsButton from "@/components/contacts/ExportContactsButton";
 
 export const metadata = { title: "Contacts" };
 
@@ -35,12 +36,7 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" asChild>
-            <a href="/api/contacts/export">
-              <Download className="mr-2 h-4 w-4" />
-              Export File
-            </a>
-          </Button>
+          <ExportContactsButton />
           <Button asChild>
             <Link href="/contacts/new">
               <Plus className="mr-2 h-4 w-4" />

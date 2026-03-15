@@ -67,6 +67,7 @@ export async function GET() {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="${fileName}"`,
       "Cache-Control": "no-store",
+      "X-Export-Count": String(contacts.length),
     },
   });
 }

@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { addLocalNotification } from "@/hooks/use-local-notifications";
 
 type PreviewData = {
   fileName: string;
@@ -122,13 +123,18 @@ export default function ImportContactsButton() {
 
       const imported = data.data?.imported ?? 0;
       const skippedRows = data.data?.skippedRows?.length ?? 0;
+      const fileName = selectedFile.name;
+      const message = `Import ${imported} contacts from file ${fileName}`;
+
       toast({
-        title: "Contacts imported",
-        description:
-          skippedRows > 0
-            ? `${imported} imported, ${skippedRows} skipped.`
-            : `${imported} contacts imported successfully.`,
+        title: "Import successful",
+        description: skippedRows > 0 ? `${message}. Skipped ${skippedRows} rows.` : message,
       });
+
+      addLocalNotification(
+        "Import contacts",
+        skippedRows > 0 ? `${message}. Skipped ${skippedRows} rows.` : message
+      );
 
       setOpen(false);
       setSelectedFile(null);
@@ -166,19 +172,21 @@ export default function ImportContactsButton() {
           <DialogHeader>
             <DialogTitle>Import Contacts from File</DialogTitle>
             <DialogDescription>
-              Upload a CSV or Excel file to import multiple contacts at once.
+              Supports CSV/XLSX. The system will automatically map columns and validate data before import.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 text-sm">
             <div className="rounded-lg border p-4">
-              <p className="font-medium">Supported fields</p>
+              <p className="font-medium">Supported Data Columns</p>
               <p className="mt-1 text-muted-foreground">
-                The importer accepts flexible headers and matches them automatically.
+                Column names can be flexible. Enum columns must use valid values (Also support Vietnamese).
               </p>
               <ul className="mt-3 space-y-1 text-muted-foreground">
                 {(preview?.supportedFields ?? [
                   "Full Name / Name / Ho Ten",
+                  "Customer Type / Loai Khach Hang (enterprise | personal | partner)",
+                  "Contact Source / Nguon Khach Hang (facebook | zalo | staff | other)",
                   "Phone Number / Phone / Mobile / So Dien Thoai / SDT",
                   "Email / Mail",
                   "Address / Dia Chi",
@@ -226,6 +234,15 @@ export default function ImportContactsButton() {
               </p>
             </div>
 
+            <div className="rounded-lg border p-4">
+              <p className="font-medium">Note when importing</p>
+              <ul className="mt-2 space-y-1 text-muted-foreground">
+                <li>Customer Type valid: enterprise, personal, partner</li>
+                <li>Contact Source valid: facebook, zalo, staff, other</li>
+                <li>If an enum is invalid, the row will be skipped and the reason will be shown in the preview.</li>
+              </ul>
+            </div>
+
             <div className="flex flex-wrap items-center gap-3">
               <Button
                 type="button"
@@ -246,36 +263,36 @@ export default function ImportContactsButton() {
                 )}
               </Button>
               <span className="text-muted-foreground">
-                {selectedFile ? selectedFile.name : "No file selected yet"}
+                {selectedFile ? selectedFile.name : "No file chosen"}
               </span>
             </div>
 
             {preview && (
               <div className="rounded-lg border p-4">
-                <p className="font-medium">Import preview</p>
+                <p className="font-medium">Preview Import Data</p>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   <div className="rounded-md border p-3">
-                    <p className="text-xs text-muted-foreground">Detected rows</p>
+                    <p className="text-xs text-muted-foreground">Total Rows Read</p>
                     <p className="text-lg font-semibold">{preview.detected}</p>
                   </div>
                   <div className="rounded-md border p-3">
-                    <p className="text-xs text-muted-foreground">Valid rows</p>
+                    <p className="text-xs text-muted-foreground">Valid Rows</p>
                     <p className="text-lg font-semibold">{preview.validRows}</p>
                   </div>
                   <div className="rounded-md border p-3">
-                    <p className="text-xs text-muted-foreground">Ready to import</p>
+                    <p className="text-xs text-muted-foreground">Ready to Import</p>
                     <p className="text-lg font-semibold">{preview.readyToImport}</p>
                   </div>
                   <div className="rounded-md border p-3">
-                    <p className="text-xs text-muted-foreground">Invalid rows</p>
+                    <p className="text-xs text-muted-foreground">Invalid Rows</p>
                     <p className="text-lg font-semibold">{preview.invalidRows.length}</p>
                   </div>
                   <div className="rounded-md border p-3">
-                    <p className="text-xs text-muted-foreground">Existing duplicates</p>
+                    <p className="text-xs text-muted-foreground">Duplicate with Existing Data</p>
                     <p className="text-lg font-semibold">{preview.duplicateExisting}</p>
                   </div>
                   <div className="rounded-md border p-3">
-                    <p className="text-xs text-muted-foreground">Duplicates in file</p>
+                    <p className="text-xs text-muted-foreground">Duplicate in File</p>
                     <p className="text-lg font-semibold">{preview.duplicateInFile}</p>
                   </div>
                 </div>

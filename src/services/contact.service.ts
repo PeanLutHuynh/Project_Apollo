@@ -262,6 +262,64 @@ export async function deleteContactsBulk(
   return result.count;
 }
 
+export async function updateContactsBulk(
+  userId: string,
+  ids: string[],
+  data: Pick<UpdateContactInput, "customerType" | "contactSource">
+): Promise<number> {
+  if (ids.length === 0) {
+    return 0;
+  }
+
+  const result = await db.contact.updateMany({
+    where: {
+      userId,
+      id: { in: ids },
+    },
+    data,
+  });
+
+  return result.count;
+}
+
+export async function updateContactsBulkField(
+  userId: string,
+  field: "customerType" | "contactSource" | "address" | "notes",
+  updates: Array<{ id: string; value: string }>
+): Promise<number> {
+  if (updates.length === 0) {
+    return 0;
+  }
+
+  const normalizedUpdates = updates.filter((item) => item.id.trim() !== "");
+  if (normalizedUpdates.length === 0) {
+    return 0;
+  }
+
+  const operations = normalizedUpdates.map((item) => {
+    const value = item.value.trim();
+    const data: UpdateContactInput =
+      field === "customerType"
+        ? { customerType: value as UpdateContactInput["customerType"] }
+        : field === "contactSource"
+          ? { contactSource: value as UpdateContactInput["contactSource"] }
+          : field === "address"
+            ? { address: value === "" ? null : value }
+            : { notes: value === "" ? null : value };
+
+    return db.contact.updateMany({
+      where: {
+        userId,
+        id: item.id,
+      },
+      data,
+    });
+  });
+
+  const results = await db.$transaction(operations);
+  return results.reduce((acc, item) => acc + item.count, 0);
+}
+
 export async function getContactCount(userId: string): Promise<number> {
   return db.contact.count({ where: { userId } });
 }
