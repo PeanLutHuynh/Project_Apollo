@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { geoBounds } from "d3-geo";
 import {
   ComposableMap,
   Geographies,
@@ -31,14 +32,30 @@ type GeoFeature = {
   };
 };
 
-const VIETNAM_GEO_URL = "/maps/vn-adm1.geojson";
+const VIETNAM_MAINLAND_GEO_URL = "/maps/vn-adm1.geojson";
+const VIETNAM_ISLANDS_GEO_URL = "/maps/vn-islands.geojson";
+const MAP_CENTER = [106, 16] as [number, number];
 const MAP_PROJECTION_CONFIG = {
-  center: [108, 16] as [number, number],
-  scale: 1400,
+  center: MAP_CENTER,
+  scale: 1800,
 };
 
+function repairVietnameseMojibake(value: string): string {
+  // GeoJSON labels may be saved with broken UTF-8 (e.g. "ThÃ¡i NguyÃªn").
+  if (!/(Ã|Â|Æ|Ä|á»|�)/.test(value)) {
+    return value;
+  }
+
+  try {
+    const repaired = Buffer.from(value, "latin1").toString("utf8");
+    return repaired.includes("�") ? value : repaired;
+  } catch {
+    return value;
+  }
+}
+
 function normalizeProvinceName(value: string): string {
-  return value
+  return repairVietnameseMojibake(value)
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[đĐ]/g, "d")
@@ -57,6 +74,22 @@ function getProvinceFill(count: number, maxCount: number): string {
   const ratio = count / maxCount;
   const lightness = 90 - ratio * 42;
   return `hsl(228 72% ${lightness}%)`;
+}
+
+function shouldRenderMainlandGeography(
+  geo: unknown,
+  normalizedProvinceName: string
+): boolean {
+  // Some ADM1 files embed remote archipelago polygons inside Da Nang/Khanh Hoa.
+  // Keep those in the dedicated islands layer to avoid confusing hover labels.
+  if (normalizedProvinceName !== "da nang" && normalizedProvinceName !== "khanh hoa") {
+    return true;
+  }
+
+  const [[minLon], [maxLon]] = geoBounds(geo as any);
+  // Mainland parts of these provinces stay west of ~110E.
+  const isRemoteOffshore = minLon > 110 || maxLon > 110.2;
+  return !isRemoteOffshore;
 }
 
 export function ProvinceMapChart({ data }: ProvinceMapChartProps) {
@@ -107,16 +140,65 @@ export function ProvinceMapChart({ data }: ProvinceMapChartProps) {
                   style={{ width: "100%", height: "100%" }}
                 >
                   <ZoomableGroup
-                    center={[108, 16]}
+                    center={MAP_CENTER}
                     zoom={zoom}
-                    minZoom={1}
+                    minZoom={0.9}
                     maxZoom={6}
                   >
-                    <Geographies geography={VIETNAM_GEO_URL}>
+                    <Geographies geography={VIETNAM_MAINLAND_GEO_URL}>
                       {({ geographies }) =>
                         geographies.map((geo) => {
                           const feature = geo as unknown as GeoFeature;
-                          const provinceName = feature.properties.shapeName ?? "";
+                          const provinceName = repairVietnameseMojibake(
+                            feature.properties.shapeName ?? ""
+                          );
+                          const normalized = normalizeProvinceName(provinceName);
+
+                          if (!shouldRenderMainlandGeography(geo, normalized)) {
+                            return null;
+                          }
+
+                          const count = provinceCountMap.get(normalized) ?? 0;
+
+                          return (
+                            <Geography
+                              key={feature.rsmKey}
+                              geography={geo}
+                              style={{
+                                default: {
+                                  fill: getProvinceFill(count, maxProvinceCount),
+                                  stroke: "hsl(220 12% 78%)",
+                                  strokeWidth: 0.85,
+                                  outline: "none",
+                                },
+                                hover: {
+                                  fill: "hsl(228 86% 58%)",
+                                  stroke: "hsl(220 14% 62%)",
+                                  strokeWidth: 1,
+                                  outline: "none",
+                                },
+                                pressed: {
+                                  fill: "hsl(228 86% 52%)",
+                                  outline: "none",
+                                },
+                              }}
+                            >
+                              <title>
+                                {provinceName}: {count} contact{count !== 1 ? "s" : ""}
+                              </title>
+                            </Geography>
+                          );
+                        })
+                      }
+                    </Geographies>
+
+                    <Geographies geography={VIETNAM_ISLANDS_GEO_URL}>
+                      {({ geographies }) =>
+                        geographies.map((geo) => {
+                          const feature = geo as unknown as GeoFeature;
+                          const provinceName = repairVietnameseMojibake(
+                            feature.properties.shapeName ?? ""
+                          );
                           const normalized = normalizeProvinceName(provinceName);
                           const count = provinceCountMap.get(normalized) ?? 0;
 
