@@ -2,17 +2,22 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Users, MessageSquare, Mail, TrendingUp, Plus } from "lucide-react";
+import { Users, MessageSquare, TrendingUp, Plus } from "lucide-react";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { getContactCount } from "@/services/contact.service";
+import {
+  getContactCount,
+  getMonthlyContactGrowth,
+  getContactSourceDistribution,
+  getContactProvinceDensity,
+} from "@/services/contact.service";
 import { getRecentCommunicationsCounts } from "@/services/communication.service";
+import { DashboardCharts } from "@/components/dashboard/DashboardCharts";
 
 export const metadata = { title: "Dashboard" };
 
@@ -20,9 +25,18 @@ export default async function DashboardPage() {
   const session = await getServerSession(authOptions);
   if (!session) redirect("/login");
 
-  const [contactCount, { todayCount, weekCount }] = await Promise.all([
+  const [
+    contactCount,
+    { todayCount, weekCount },
+    monthlyGrowth,
+    sourceDistribution,
+    provinceDensity,
+  ] = await Promise.all([
     getContactCount(session.user.id),
     getRecentCommunicationsCounts(session.user.id),
+    getMonthlyContactGrowth(session.user.id),
+    getContactSourceDistribution(session.user.id),
+    getContactProvinceDensity(session.user.id, 16),
   ]);
 
   const stats = [
@@ -94,64 +108,11 @@ export default async function DashboardPage() {
         })}
       </div>
 
-      {/* Quick actions */}
-      <div>
-        <h2 className="text-lg font-semibold text-foreground mb-3">
-          Quick Actions
-        </h2>
-        <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
-          <Card className="hover:shadow-md transition-shadow">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Users className="h-4 w-4 text-primary" />
-                Manage Contacts
-              </CardTitle>
-              <CardDescription className="text-xs">
-                View, add, and edit your contacts
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button variant="outline" size="sm" asChild className="w-full">
-                <Link href="/contacts">View Contacts</Link>
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="hover:shadow-md transition-shadow">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <MessageSquare className="h-4 w-4 text-primary" />
-                Send SMS
-              </CardTitle>
-              <CardDescription className="text-xs">
-                Send text messages to contacts
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button variant="outline" size="sm" asChild className="w-full">
-                <Link href="/communication/sms">Send SMS</Link>
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="hover:shadow-md transition-shadow">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Mail className="h-4 w-4 text-primary" />
-                Send Email
-              </CardTitle>
-              <CardDescription className="text-xs">
-                Send emails to your contacts
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button variant="outline" size="sm" asChild className="w-full">
-                <Link href="/communication/email">Send Email</Link>
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+      <DashboardCharts
+        monthlyGrowth={monthlyGrowth}
+        sourceDistribution={sourceDistribution}
+        provinceDensity={provinceDensity}
+      />
     </div>
   );
 }
