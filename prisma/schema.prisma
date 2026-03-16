@@ -44,7 +44,7 @@ enum ContactSource {
 model User {
   id        String    @id @default(uuid())
   email     String    @unique
-  password  String
+  password  String?
   name      String?
   role      UserRole  @default(user)
   failedLoginAttempts Int @default(0)

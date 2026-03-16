@@ -1,4 +1,5 @@
 import "next-auth";
+import "next-auth/jwt";
 import type { CommunicationType, CommunicationStatus } from "@prisma/client";
 
 export type CustomerType = "enterprise" | "personal" | "partner";
@@ -14,6 +15,13 @@ declare module "next-auth" {
       image?: string | null;
       role: string;
     };
+  }
+}
+
+declare module "next-auth/jwt" {
+  interface JWT {
+    id?: string;
+    role?: string;
   }
 }
 

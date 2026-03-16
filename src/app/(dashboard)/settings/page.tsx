@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -48,6 +48,7 @@ export default function SettingsPage() {
   const { data: session } = useSession();
   const [profileSuccess, setProfileSuccess] = useState(false);
   const [pwSuccess, setPwSuccess] = useState(false);
+  const [canChangePassword, setCanChangePassword] = useState(true);
 
   const profileForm = useForm<ProfileValues>({
     resolver: zodResolver(profileSchema),
@@ -91,6 +92,31 @@ export default function SettingsPage() {
     }
   }
 
+  useEffect(() => {
+    let active = true;
+
+    async function loadProfileMeta() {
+      const res = await fetch("/api/auth/profile");
+      if (!res.ok || !active) {
+        return;
+      }
+
+      const payload = (await res.json()) as {
+        data?: { hasPassword?: boolean };
+      };
+
+      if (active && typeof payload.data?.hasPassword === "boolean") {
+        setCanChangePassword(payload.data.hasPassword);
+      }
+    }
+
+    void loadProfileMeta();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div>
@@ -113,7 +139,7 @@ export default function SettingsPage() {
               <AlertDescription>Profile updated successfully.</AlertDescription>
             </Alert>
           )}
-          <div className="mb-4 text-sm text-muted-foreground">
+          <div className="mb-4 text-sm text-muted-foreground break-all">
             <span className="font-medium">Email: </span>
             {session?.user?.email}
           </div>
@@ -150,78 +176,85 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      <Separator />
+      {canChangePassword && (
+        <>
+          <Separator />
 
-      {/* Password */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Change Password</CardTitle>
-          <CardDescription>
-            Keep your account secure with a strong password
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {pwSuccess && (
-            <Alert className="mb-4">
-              <CheckCircle className="h-4 w-4" />
-              <AlertDescription>Password changed successfully.</AlertDescription>
-            </Alert>
-          )}
-          <Form {...pwForm}>
-            <form
-              onSubmit={pwForm.handleSubmit(onPasswordSubmit)}
-              className="space-y-4"
-            >
-              <FormField
-                control={pwForm.control}
-                name="currentPassword"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Current Password</FormLabel>
-                    <FormControl>
-                      <Input type="password" placeholder="••••••••" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={pwForm.control}
-                name="newPassword"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>New Password</FormLabel>
-                    <FormControl>
-                      <Input type="password" placeholder="Min. 8 characters" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={pwForm.control}
-                name="confirmPassword"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Confirm New Password</FormLabel>
-                    <FormControl>
-                      <Input type="password" placeholder="Repeat password" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <Button type="submit" disabled={pwForm.formState.isSubmitting}>
-                {pwForm.formState.isSubmitting ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Changing...</>
-                ) : (
-                  "Change Password"
-                )}
-              </Button>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
+          {/* Password */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Change Password</CardTitle>
+              <CardDescription>
+                Keep your account secure with a strong password
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {pwSuccess && (
+                <Alert className="mb-4">
+                  <CheckCircle className="h-4 w-4" />
+                  <AlertDescription>Password changed successfully.</AlertDescription>
+                </Alert>
+              )}
+              <Form {...pwForm}>
+                <form
+                  onSubmit={pwForm.handleSubmit(onPasswordSubmit)}
+                  className="space-y-4"
+                >
+                  <FormField
+                    control={pwForm.control}
+                    name="currentPassword"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Current Password</FormLabel>
+                        <FormControl>
+                          <Input type="password" placeholder="••••••••" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={pwForm.control}
+                    name="newPassword"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>New Password</FormLabel>
+                        <FormControl>
+                          <Input type="password" placeholder="Min. 8 characters" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={pwForm.control}
+                    name="confirmPassword"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Confirm New Password</FormLabel>
+                        <FormControl>
+                          <Input type="password" placeholder="Repeat password" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <Button type="submit" disabled={pwForm.formState.isSubmitting}>
+                    {pwForm.formState.isSubmitting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Changing...
+                      </>
+                    ) : (
+                      "Change Password"
+                    )}
+                  </Button>
+                </form>
+              </Form>
+            </CardContent>
+          </Card>
+        </>
+      )}
     </div>
   );
 }

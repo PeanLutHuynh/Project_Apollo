@@ -1,10 +1,14 @@
 import { NextAuthOptions } from "next-auth";
+import { Prisma } from "@prisma/client";
 import CredentialsProvider from "next-auth/providers/credentials";
+import GoogleProvider from "next-auth/providers/google";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 
 const MAX_FAILED_LOGIN_ATTEMPTS = 5;
 const LOCKOUT_MINUTES = 15;
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 
 export const authOptions: NextAuthOptions = {
   session: {
@@ -12,6 +16,14 @@ export const authOptions: NextAuthOptions = {
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   providers: [
+    ...(GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET
+      ? [
+          GoogleProvider({
+            clientId: GOOGLE_CLIENT_ID,
+            clientSecret: GOOGLE_CLIENT_SECRET,
+          }),
+        ]
+      : []),
     CredentialsProvider({
       name: "credentials",
       credentials: {
@@ -30,6 +42,9 @@ export const authOptions: NextAuthOptions = {
         });
 
         if (!user) return null;
+
+        // Password login is disabled for Google-only accounts.
+        if (!user.password) return null;
 
         if (user.lockoutUntil && user.lockoutUntil.getTime() > Date.now()) {
           return null;
@@ -77,11 +92,69 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        token.id = user.id;
-        token.role = (user as unknown as { role: string }).role;
+    async signIn({ user, account }) {
+      if (account?.provider !== "google") {
+        return true;
       }
+
+      const email = user.email?.trim().toLowerCase();
+      if (!email) {
+        return false;
+      }
+
+      const existingUser = await db.user.findUnique({
+        where: { email },
+      });
+
+      if (existingUser && existingUser.password !== null) {
+        return "/login?error=EmailExistsWithPassword";
+      }
+
+      if (!existingUser) {
+        try {
+          await db.user.create({
+            data: {
+              email,
+              name: user.name?.trim() || null,
+              password: null,
+            },
+          });
+        } catch (error) {
+          if (error instanceof Prisma.PrismaClientKnownRequestError) {
+            // Race condition: user created in another request between findUnique and create.
+            if (error.code === "P2002") {
+              return true;
+            }
+
+            // Common when database schema hasn't been updated yet (password still NOT NULL).
+            if (error.code === "P2011") {
+              return "/login?error=GoogleSignupUnavailable";
+            }
+          }
+
+          return "/login?error=GoogleSignupUnavailable";
+        }
+      }
+
+      return true;
+    },
+    async jwt({ token, user }) {
+      if (user?.id) {
+        token.id = user.id;
+      }
+
+      if (token.email && (!token.id || !token.role || user)) {
+        const dbUser = await db.user.findUnique({
+          where: { email: token.email },
+          select: { id: true, role: true },
+        });
+
+        if (dbUser) {
+          token.id = dbUser.id;
+          token.role = dbUser.role;
+        }
+      }
+
       return token;
     },
     async session({ session, token }) {
