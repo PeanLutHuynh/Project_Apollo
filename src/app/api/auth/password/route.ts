@@ -39,6 +39,16 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
+  if (!user.password) {
+    return NextResponse.json(
+      {
+        error:
+          "Password sign-in is not enabled for this account. Use Google sign-in or reset password first.",
+      },
+      { status: 400 }
+    );
+  }
+
   const isValid = await bcrypt.compare(parsed.data.currentPassword, user.password);
   if (!isValid) {
     return NextResponse.json(

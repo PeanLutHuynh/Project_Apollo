@@ -137,12 +137,18 @@ export function Header({ user }: HeaderProps) {
               </Avatar>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-56" align="end" forceMount>
+          <DropdownMenuContent
+            className="w-[24rem] max-w-[calc(100vw-1rem)]"
+            align="end"
+            forceMount
+          >
             <DropdownMenuLabel className="font-normal">
               <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium leading-none">{displayName}</p>
+                <p className="text-sm font-medium leading-tight break-words">
+                  {displayName}
+                </p>
                 {user.email && (
-                  <p className="text-xs leading-none text-muted-foreground">
+                  <p className="text-xs leading-tight text-muted-foreground break-all">
                     {user.email}
                   </p>
                 )}

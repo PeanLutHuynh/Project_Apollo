@@ -83,12 +83,15 @@ export function addLocalNotification(title: string, description: string) {
 }
 
 export function useLocalNotifications() {
-  ensureInitialized();
-
-  const [state, setState] = useState<NotificationState>(memoryState);
+  // Start from deterministic SSR-safe state; hydrate from localStorage after mount.
+  const [state, setState] = useState<NotificationState>({ items: [] });
 
   useEffect(() => {
     listeners.push(setState);
+
+    ensureInitialized();
+    notify();
+
     return () => {
       const index = listeners.indexOf(setState);
       if (index >= 0) {

@@ -21,13 +21,13 @@ function getClientIp(req: NextRequest): string {
 }
 
 function logImportEvent(event: string, metadata: Record<string, unknown>) {
-  console.log(
-    JSON.stringify({
+  process.stdout.write(
+    `${JSON.stringify({
       event,
       source: "api/contacts/import",
       timestamp: new Date().toISOString(),
       ...metadata,
-    })
+    })}\n`
   );
 }
 
